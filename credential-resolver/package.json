@@ -1,0 +1,20 @@
+{
+  "name": "credential-resolver",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/resolver.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "~5.4"
+  }
+}
