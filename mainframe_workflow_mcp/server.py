@@ -82,6 +82,7 @@ def build_executor() -> LocalToolExecutor:
         "user": creds.user,
         "password": creds.password,
         "ssl_verification": creds.reject_unauthorized,
+        "protocol": creds.protocol,
     }
     client = ZoweSdkMainframeClient(
         config.ZOWE_PROFILE,

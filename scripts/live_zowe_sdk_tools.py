@@ -102,6 +102,7 @@ async def main() -> int:
         "user": creds.user,
         "password": creds.password,
         "ssl_verification": creds.reject_unauthorized,
+        "protocol": creds.protocol,
     }
     client = ZoweSdkMainframeClient(
         PROFILE,

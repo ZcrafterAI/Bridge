@@ -28,14 +28,17 @@ class ZoweSdkMainframeClient:
             raise ValueError("Zowe CLI profile name is required.")
         self.profile_name = profile_name
         self._timeout = timeout_seconds
-        self._files = files if files is not None else Files(connection)
-        self._jobs = jobs if jobs is not None else Jobs(connection)
-        self._zosmf = zosmf if zosmf is not None else Zosmf(connection)
+        self._protocol = _string(connection.get("protocol"), "https") or "https"
+        sdk_connection = {key: value for key, value in connection.items() if key != "protocol"}
+        self._files = files if files is not None else Files(sdk_connection)
+        self._jobs = jobs if jobs is not None else Jobs(sdk_connection)
+        self._zosmf = zosmf if zosmf is not None else Zosmf(sdk_connection)
         self._apply_csrf(self._files)
         self._apply_csrf(self._jobs)
         self._apply_csrf(self._zosmf)
-        if base_path:
-            self._apply_base_path(base_path)
+        self._normalize_endpoint(self._files, base_path, "restfiles/")
+        self._normalize_endpoint(self._jobs, base_path, "restjobs/jobs/")
+        self._normalize_endpoint(self._zosmf, base_path, "info")
 
     def _apply_csrf(self, sdk: Any) -> None:
         for headers in (
@@ -60,17 +63,15 @@ class ZoweSdkMainframeClient:
                 headers["Content-Type"] = "application/json"
                 headers["Content-type"] = "application/json"
 
-    def _apply_base_path(self, base_path: str) -> None:
-        prefix = base_path.rstrip("/")
-        self._rewrite_endpoint(self._files, f"{prefix}/restfiles/")
-        self._rewrite_endpoint(self._jobs, f"{prefix}/restjobs/jobs/")
-        self._rewrite_endpoint(self._zosmf, f"{prefix}/info")
-
-    def _rewrite_endpoint(self, sdk: Any, service_path: str) -> None:
+    def _normalize_endpoint(self, sdk: Any, base_path: str, default_service_path: str) -> None:
         host_url = getattr(getattr(sdk, "connection", None), "host_url", None)
         if not host_url:
             return
-        endpoint = f"https://{host_url}{service_path}"
+        if base_path:
+            service_path = f"{base_path.rstrip('/')}/{default_service_path}"
+        else:
+            service_path = getattr(sdk, "default_service_url", f"/zosmf/{default_service_path}")
+        endpoint = f"{self._protocol}://{host_url}{service_path}"
         sdk.request_endpoint = endpoint
         if isinstance(getattr(sdk, "request_arguments", None), dict):
             sdk.request_arguments["url"] = endpoint
