@@ -62,6 +62,7 @@ def test_build_executor_uses_configured_zowe_profile(monkeypatch):
             port=10443,
             user="IBMUSER",
             password="secret",
+            protocol="https",
             reject_unauthorized=False,
             base_path=None,
         ),
