@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fastmcp import FastMCP
-from zcrafter_mainframe.executor import LocalToolExecutor
+from ._toolbox import LocalToolExecutor
 from .credentials import resolve_credentials
 from . import config
 from .action_log_sink import ActionLogSink

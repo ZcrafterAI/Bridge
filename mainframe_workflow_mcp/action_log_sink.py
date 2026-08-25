@@ -3,7 +3,7 @@ import contextvars
 import json
 from datetime import datetime, timezone
 from typing import Any
-from zcrafter_mainframe.action_log import _sanitize_action_input
+from ._toolbox import _sanitize_action_input
 from .db import RequestStore
 
 current_request_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(

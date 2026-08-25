@@ -4,4 +4,6 @@ python-dotenv>=1.0
 zowe-zos-files-for-zowe-sdk==0.5.0
 zowe-zos-jobs-for-zowe-sdk==0.5.0
 zowe-zosmf-for-zowe-sdk==0.0.1
-zcrafter-mainframe-mcp @ git+https://github.com/sangsang01/Zcrafter@2e4398560d51c2bba2514c21a82746fa15e580b0#subdirectory=zcrafter-mainframe-mcp
+# Optional: the private toolbox. When installed it replaces the bundled
+# reference implementation in mainframe_workflow_mcp/toolbox automatically.
+# zcrafter-mainframe-mcp @ git+https://github.com/sangsang01/Zcrafter@2e4398560d51c2bba2514c21a82746fa15e580b0#subdirectory=zcrafter-mainframe-mcp

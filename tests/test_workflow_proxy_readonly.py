@@ -1,6 +1,6 @@
 import pytest
 from fastmcp import FastMCP, Client
-from zcrafter_mainframe.contract import list_tool_definitions
+from mainframe_workflow_mcp._toolbox import list_tool_definitions
 import mainframe_workflow_mcp.proxy as proxy_module
 from mainframe_workflow_mcp.proxy import register_zcrafter_tools
 

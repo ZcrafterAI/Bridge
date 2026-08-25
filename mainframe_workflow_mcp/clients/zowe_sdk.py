@@ -4,7 +4,7 @@ import asyncio
 import re
 from typing import Any
 
-from zcrafter_mainframe.patch import apply_unified_diff
+from .._toolbox import apply_unified_diff
 from zowe.zos_files_for_zowe_sdk import Files
 from zowe.zos_jobs_for_zowe_sdk import Jobs
 from zowe.zosmf_for_zowe_sdk import Zosmf
@@ -149,6 +149,11 @@ class ZoweSdkMainframeClient:
         codes = expected_code if expected_code is not None else [200]
         return self._jobs.request_handler.perform_request(method, args, codes)
 
+    async def list_profiles(self, input: dict[str, Any]) -> dict[str, Any]:
+        """The profile this server is bound to. Every other tool requires
+        profileName, and without this an agent has no way to discover it."""
+        return {"profiles": [self.profile_name], "default": self.profile_name}
+
     async def verify_connection(self, input: dict[str, Any]) -> dict[str, Any]:
         self._assert_profile(input)
         info = await self._run(self._zosmf.get_info)
@@ -195,13 +200,13 @@ class ZoweSdkMainframeClient:
     async def read_dataset(self, input: dict[str, Any]) -> dict[str, Any]:
         self._assert_profile(input)
         payload = await self._run(self._files.get_dsn_content, _string(input["dataset"]))
-        return {"content": _content(payload)}
+        return _excerpt(_content(payload), input)
 
     async def read_member(self, input: dict[str, Any]) -> dict[str, Any]:
         self._assert_profile(input)
         target = _format_member(input["dataset"], input["member"])
         payload = await self._run(self._files.get_dsn_content, target)
-        return {"content": _content(payload)}
+        return _excerpt(_content(payload), input)
 
     async def list_members(self, input: dict[str, Any]) -> dict[str, Any]:
         self._assert_profile(input)
@@ -435,7 +440,7 @@ class ZoweSdkMainframeClient:
         if spool_id.endswith(".0"):
             spool_id = str(int(float(spool_id)))
         payload = await self._run(self._jobs_request, "GET", f"{job_name}/{job_id}/files/{spool_id}/records")
-        return {"content": _content(payload)}
+        return _excerpt(_content(payload), input)
 
     async def get_job_output(self, input: dict[str, Any]) -> dict[str, Any]:
         self._assert_profile(input)
@@ -444,9 +449,13 @@ class ZoweSdkMainframeClient:
         for spool_file in spool["spoolFiles"]:
             if spool_file.get("id") is None:
                 continue
-            content = await self.get_job_spool_content({**input, "spoolId": spool_file["id"]})
+            # read each file whole, then filter the joined output once, so a
+            # search spans the job rather than each spool file separately
+            content = await self.get_job_spool_content(
+                {**input, "spoolId": spool_file["id"], "searchText": None, "maxLines": None}
+            )
             contents.append(content["content"])
-        return {"content": "\n\n".join(contents), "spoolFiles": spool["spoolFiles"]}
+        return {**_excerpt("\n\n".join(contents), input), "spoolFiles": spool["spoolFiles"]}
 
     async def _resolve_job(self, input: dict[str, Any]) -> tuple[str, str]:
         job_id = _string(input["jobId"])
@@ -658,6 +667,46 @@ def _make_matcher(needle: str, case_sensitive: bool, regex: bool):
         return lambda line: needle in line
     lowered = needle.lower()
     return lambda line: lowered in line.lower()
+
+
+def _excerpt(content: str, input: dict[str, Any]) -> dict[str, Any]:
+    """Return only the part of `content` the caller asked for.
+
+    Reading a large member or spool file whole is the most expensive thing an
+    agent can do here: a 40,000-line job log costs far more to put in a model's
+    context than it does to fetch. `searchText` returns just the matching lines
+    (with their line numbers), `maxLines` caps the result, and the response says
+    what was left out so the caller never mistakes an excerpt for the whole
+    file. With neither set, behaviour is unchanged.
+    """
+    needle = _string(input.get("searchText")).strip()
+    raw_max = input.get("maxLines")
+    if not needle and raw_max in (None, ""):
+        return {"content": content}
+
+    lines = _split_lines(content)
+    total = len(lines)
+    result: dict[str, Any] = {"totalLines": total}
+
+    if needle:
+        matcher = _make_matcher(needle, bool(input.get("caseSensitive")), bool(input.get("regex")))
+        matched = [(i, line) for i, line in enumerate(lines, start=1) if matcher(line)]
+        result["matchCount"] = len(matched)
+        lines = [f"{i}: {line}" for i, line in matched]
+
+    try:
+        limit = int(raw_max)
+    except (TypeError, ValueError):
+        limit = 0
+    if limit > 0 and len(lines) > limit:
+        result["truncated"] = True
+        result["returnedLines"] = limit
+        lines = lines[:limit]
+    else:
+        result["returnedLines"] = len(lines)
+
+    result["content"] = "\n".join(lines)
+    return result
 
 
 def _split_lines(content: str) -> list[str]:

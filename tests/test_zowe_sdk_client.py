@@ -32,7 +32,7 @@ class FakeSdk:
         return {"url": self.request_endpoint, "auth": ("u", "p"), "headers": {"Content-type": "application/json"}}
 
     def list_dsn(self, name_pattern):
-        return {"items": [{"dsname": "Z86131.JCL", "dsorg": "PO", "recfm": "FB", "lrecl": "80"}]}
+        return {"items": [{"dsname": "IBMUSER.JCL", "dsorg": "PO", "recfm": "FB", "lrecl": "80"}]}
 
     def list_dsn_members(self, dataset_name):
         return [{"member": "IEFBR14"}]
@@ -47,10 +47,10 @@ class FakeSdk:
         return {"zos_version": "05.29.00", "zosmf_version": "2.5"}
 
     def list_jobs(self, owner=None, prefix="*", max_jobs=1000, user_correlator=None):
-        return [{"jobname": "TESTJOB", "jobid": "JOB00123", "status": "OUTPUT", "retcode": "CC 0000", "owner": "Z86131"}]
+        return [{"jobname": "TESTJOB", "jobid": "JOB00123", "status": "OUTPUT", "retcode": "CC 0000", "owner": "IBMUSER"}]
 
     def get_job_status(self, jobname, jobid):
-        return {"jobname": jobname, "jobid": jobid, "status": "OUTPUT", "retcode": "CC 0000", "owner": "Z86131"}
+        return {"jobname": jobname, "jobid": jobid, "status": "OUTPUT", "retcode": "CC 0000", "owner": "IBMUSER"}
 
     def submit_plaintext(self, jcl):
         return {"jobname": "TESTJOB", "jobid": "JOB00999"}
@@ -80,7 +80,7 @@ def make_client(timeout=5.0, **overrides) -> ZoweSdkMainframeClient:
 async def test_profile_mismatch_fails_before_http():
     client = make_client()
     with pytest.raises(ValueError, match="does not match"):
-        await client.list_datasets({"profileName": "other", "pattern": "Z86131.**"})
+        await client.list_datasets({"profileName": "other", "pattern": "IBMUSER.**"})
     assert client._handler.calls == []
 
 
@@ -97,8 +97,8 @@ async def test_verify_connection_returns_cli_shape():
 @pytest.mark.anyio
 async def test_list_datasets_normalizes_items():
     client = make_client()
-    result = await client.list_datasets({**PROFILE, "pattern": "Z86131.**"})
-    assert result["dataSets"][0]["name"] == "Z86131.JCL"
+    result = await client.list_datasets({**PROFILE, "pattern": "IBMUSER.**"})
+    assert result["dataSets"][0]["name"] == "IBMUSER.JCL"
     assert result["dataSets"][0]["organization"] == "PO"
 
 

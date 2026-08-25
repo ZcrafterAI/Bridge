@@ -12,21 +12,21 @@ import {
 describe("findZosmfProfile", () => {
   it("returns the named profile", () => {
     const config = {
-      profiles: { zosmf1: { properties: { host: "xplore.example.com" } } },
+      profiles: { zosmf1: { properties: { host: "zosmf.example.com" } } },
       defaults: { zosmf: "zosmf1" },
     };
     expect(findZosmfProfile(config, "zosmf1")).toEqual({
-      properties: { host: "xplore.example.com" },
+      properties: { host: "zosmf.example.com" },
     });
   });
 
   it("falls back to the config default profile when none is named", () => {
     const config = {
-      profiles: { zosmf1: { properties: { host: "xplore.example.com" } } },
+      profiles: { zosmf1: { properties: { host: "zosmf.example.com" } } },
       defaults: { zosmf: "zosmf1" },
     };
     expect(findZosmfProfile(config, undefined)).toEqual({
-      properties: { host: "xplore.example.com" },
+      properties: { host: "zosmf.example.com" },
     });
   });
 
@@ -64,14 +64,14 @@ describe("resolveZosmfProperties", () => {
       profiles: {
         zosmf: { properties: { port: 10443 }, secure: [] as string[] },
         project_base: {
-          properties: { host: "204.90.115.200", rejectUnauthorized: false },
+          properties: { host: "zosmf.example.com", rejectUnauthorized: false },
           secure: ["user", "password"],
         },
       },
       defaults: { zosmf: "zosmf", base: "project_base" },
     };
     const resolved = resolveZosmfProperties(config, "zosmf");
-    expect(resolved.properties.host).toBe("204.90.115.200");
+    expect(resolved.properties.host).toBe("zosmf.example.com");
     expect(resolved.properties.port).toBe(10443);
     expect(resolved.properties.rejectUnauthorized).toBe(false);
     expect(resolved.secure).toEqual(expect.arrayContaining(["user", "password"]));

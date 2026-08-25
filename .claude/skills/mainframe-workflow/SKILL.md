@@ -12,8 +12,15 @@ behind a request that has an approved spec and an approved plan (see
 
 ## When this applies
 
-Any user request touching datasets, PDS/PDSE members, jobs, JCL, or z/OSMF —
-whether read-only investigation or an actual change.
+Any user request touching datasets, PDS/PDSE members, jobs, JCL, or z/OSMF.
+
+**Reads need no request.** Call read-only tools directly and answer. Open a
+request only when something will change on z/OS.
+
+**Two habits.** Every tool takes `profileName` — call `profile.list` if you
+don't know it, never guess. Reads accept `searchText`/`maxLines`/`regex`: search
+a large log rather than reading it back whole, and if a result says
+`truncated`, say so.
 
 ## The flow
 
@@ -24,7 +31,7 @@ whether read-only investigation or an actual change.
    `record_clarification(request_id, question, answer)`. This step has no
    approval gate; use judgment about when you have enough to draft a spec.
 3. **Spec.** Call `draft_spec(request_id, content)` with a concise spec: what
-   changes, why, and what "done" looks like. Read-only zcrafter tools
+   changes, why, and what "done" looks like. Read-only tools
    (`dataset.read`, `member.list`, `job.output`, etc.) are available any time
    during this step to ground the spec in the real system — they never need
    a `request_id`. Present the spec in chat and ask the user to approve it

@@ -1,27 +1,17 @@
-.worktrees/
+# Python
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
+
+# Node
 node_modules/
 credential-resolver/dist/
-memory/*.md
-memory/*.db
-!memory/.gitkeep
-.superpowers/
-docs/superpowers/
-mainframe_mcp/
-tests/test_server.py
-tests/test_memory.py
-tests/test_db.py
-tests/test_dataset_scan_runner.py
-tests/test_user_info_runner.py
-tests/test_zosmf_client_jobs.py
-tests/test_zosmf_client_datasets.py
-tests/test_zosmf_client_tso.py
-mainframe_workflow_mcp/state.db
-mainframe_workflow_mcp/archive/
+
+# Local config and state — never commit these
 .env
 .mcp.json
 zowe.config.json
 zowe.config.user.json
-zowe.schema.json
+mainframe_workflow_mcp/state.db
+mainframe_workflow_mcp/archive/

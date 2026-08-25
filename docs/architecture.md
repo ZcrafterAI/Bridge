@@ -26,7 +26,7 @@ scripts/                  optional live z/OSMF smoke script
 docs/architecture.md      this file
 ```
 
-`zcrafter-mainframe-mcp` is not copied into this repo. It is a pip dependency from the private GitHub repo `sangsang01/Zcrafter` (subdirectory `zcrafter-mainframe-mcp`). This server imports it, auto-registers its tools, and adds the request gate on top.
+The z/OSMF tool surface lives in `mainframe_workflow_mcp/toolbox/` — a reference implementation that ships with the repo, so a fresh clone runs with no private access. `mainframe_workflow_mcp/_toolbox.py` resolves it: if the private `zcrafter-mainframe-mcp` package is installed it is used instead, otherwise the bundled one is. Either way this server auto-registers the tools and adds the request gate on top.
 
 ## Runtime flow
 
