@@ -1,26 +1,15 @@
 # Zcrafter Bridge
 
-Give Claude Code real access to your mainframe — and keep it from changing anything you haven't approved.
+Give AI Agents real access to your mainframe and keep it from changing anything you haven't approved.
 
-Ask in plain English: *"Why did PAYJOB fail?"* Claude reads the spool, finds the cause, tells you. Ask it to **fix** something and it stops: it writes a spec, waits for your yes, writes a plan, waits again. Only then does it touch z/OS.
+<img width="3000" height="1027" alt="6770AD52-6CF4-4300-9BF8-2D1A6C96FB9C" src="https://github.com/user-attachments/assets/98dc50c8-0752-4c3a-a491-0d8af2311460" />
 
-```
-You:     The batch job PAYJOB is failing. Find out why and fix it.
-Claude:  [reads the spool, finds a missing dataset]
-         Here's the spec — one line of JCL to change. Approve?
-You:     yes
-Claude:  Here's the plan. Approve?
-You:     yes
-Claude:  Patched, resubmitted, CC 0000. Done.
-```
-
----
 
 ## What's an MCP server?
 
-MCP is how Claude Code talks to outside systems. An MCP server hands Claude a set of tools it can call. Bridge is an MCP server whose tools are your mainframe — datasets, members, jobs, spool — with an approval gate in front of anything destructive.
+MCP is how AI Agents talks to outside systems. An MCP server hands AI a set of tools it can call. Bridge is an MCP server whose tools are your mainframe - datasets, members, jobs, spool, with an approval gate in front of anything destructive.
 
-Install it once, point Claude Code at it, then just talk to Claude.
+Install it once, point Claude Code/Codex at it, then just talk to Claude.
 
 ---
 
@@ -76,22 +65,6 @@ Verify with `claude mcp list` — you want `mainframe-workflow: ✔ Connected`.
 ```bash
 mkdir -p ~/.claude/skills
 cp -r .claude/skills/mainframe-workflow ~/.claude/skills/
-```
-
-This teaches Claude the approval workflow. Without it, Claude has the tools but not the process.
-
-### 6. Try it
-
-Start `claude` and ask:
-
-```
-What datasets do I have?
-```
-
-Then something real:
-
-```
-Why did my last failed job fail?
 ```
 
 ---
