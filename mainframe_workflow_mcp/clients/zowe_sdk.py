@@ -11,6 +11,14 @@ from zowe.zosmf_for_zowe_sdk import Zosmf
 
 _API_ML_UNSUPPORTED = "API ML service discovery is not available through the REST provider yet."
 
+# job.wait polls a live z/OSMF endpoint. Dev targets like IBM Z Xplore are
+# shared, rate-limited, multi-tenant systems -- not something to hammer with
+# a tight loop -- so these are hard floors/ceilings, not just defaults:
+# whatever a caller (or a model choosing tool args) asks for, a wait can
+# never poll faster than once a second or run more than 60 attempts.
+_WAIT_MIN_DELAY_SECONDS = 1.0
+_WAIT_MAX_ATTEMPTS = 60
+
 
 class ZoweSdkMainframeClient:
     def __init__(
@@ -405,8 +413,8 @@ class ZoweSdkMainframeClient:
     async def wait_for_job(self, input: dict[str, Any]) -> dict[str, Any]:
         self._assert_profile(input)
         target_status = _string(input.get("status"), "OUTPUT").upper()
-        attempts = int(input.get("attempts") or 30)
-        delay_seconds = int(input.get("delayMs") or 1000) / 1000
+        attempts = min(int(input.get("attempts") or 30), _WAIT_MAX_ATTEMPTS)
+        delay_seconds = max(int(input.get("delayMs") or 1000) / 1000, _WAIT_MIN_DELAY_SECONDS)
         last_status: dict[str, Any] | None = None
         for attempt in range(max(1, attempts)):
             last_status = await self.get_job_status(input)

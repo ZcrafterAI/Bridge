@@ -68,7 +68,10 @@ _DEFINITIONS: list[dict[str, Any]] = [
     _t("job.list", "never", "List jobs by owner, prefix or status.", {},
        {"owner": _S, "prefix": _S, "status": _S, "limit": _I}),
     _t("job.status", "never", "Status and return code for one job.", _JOB, _JOBNAME),
-    _t("job.wait", "never", "Poll until a job reaches a status.", _JOB,
+    _t("job.wait", "never",
+       "Poll until a job reaches a status. attempts and delayMs are capped "
+       "server-side (max 60 attempts, min 1000ms apart) regardless of what's "
+       "passed -- z/OS dev targets are shared, rate-limited systems.", _JOB,
        {**_JOBNAME, "status": _S, "attempts": _I, "delayMs": _I}),
     _t("job.jcl", "never", "Retrieve the JCL a job was submitted with.", _JOB, _JOBNAME),
     _t("job.spool.list", "never", "List a job's spool files.", _JOB, _JOBNAME),

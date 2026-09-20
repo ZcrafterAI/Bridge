@@ -123,13 +123,21 @@ docker run -p 8000:8000 \
 
 In KinD, those three come from a mounted K8s Secret instead of literal `-e` flags.
 
+### A note on IBM Z Xplore
+
+If your `ZOSMF_HOST` points at [IBM Z Xplore](https://ibm.com/z/resources/zxplore): it's a **shared, multi-tenant learning environment**, not a private sandbox. Treat credentials against it as rate-limited and best-effort:
+
+- Don't wire it into automated CI or any repeated/scripted test loop. Manual runs only.
+- `job.wait`'s polling is clamped server-side (max 60 attempts, minimum 1s apart) specifically so this tool can't hammer a shared z/OSMF instance with a tight loop, no matter what a caller asks for.
+- If KinD's dev environment ends up exercising Xplore through automated test cycles rather than manual runs, stop and reconsider — that's the usage pattern the platform wasn't built for.
+
 ---
 
 ## Development
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                    # 45 tests
+pytest                                    # 47 tests
 cd credential-resolver && npm test        # 8 tests
 ```
 

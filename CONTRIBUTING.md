@@ -30,6 +30,8 @@ cd credential-resolver && npm test && cd ..
 
 Unit tests do not need a live mainframe. There is no live-mainframe smoke script in this repo yet (a pre-existing doc referenced one under `scripts/`; that directory doesn't exist) — testing against a real z/OSMF target currently means running the server itself against Z Xplore.
 
+**If that target is IBM Z Xplore: it's a shared, multi-tenant learning environment, not a private sandbox.** Run manual, occasional checks against it — never wire it into CI or any automated/repeated test loop, and don't add a live-test script here that would run on every push. If you're building one for occasional manual use, keep it deliberately light (few calls, sane delays); `job.wait`'s polling is already clamped server-side for this reason (see `clients/zowe_sdk.py`).
+
 ## Local-only paths (not in git)
 
 On a maintainer checkout you may still see:

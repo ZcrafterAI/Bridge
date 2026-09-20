@@ -140,3 +140,44 @@ async def test_client_does_not_spawn_zowe(monkeypatch):
     await client.list_jobs(PROFILE)
     await client.read_member({**PROFILE, "dataset": "A.B", "member": "M"})
     assert spawned == []
+
+
+@pytest.mark.anyio
+async def test_wait_for_job_clamps_delay_to_a_floor(monkeypatch):
+    # Z Xplore (and any real z/OSMF dev target) is shared and rate-limited --
+    # a caller must never be able to poll it faster than once a second, no
+    # matter how small a delayMs it asks for.
+    sleeps = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    client = make_client()
+    result = await client.wait_for_job(
+        {**PROFILE, "jobId": "JOB00123", "jobName": "TESTJOB", "status": "OUTPUT", "attempts": 2, "delayMs": 1}
+    )
+    assert result["status"] == "OUTPUT"
+    # FakeSdk's get_job_status always returns OUTPUT, so this succeeds on the
+    # first attempt with no sleep at all -- the floor is exercised below.
+
+
+@pytest.mark.anyio
+async def test_wait_for_job_clamps_attempts_to_a_ceiling(monkeypatch):
+    sleeps = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    client = make_client()
+    # FakeSdk's get_job_status always returns OUTPUT, so waiting for a status
+    # it never reports means every attempt is used up.
+    with pytest.raises(TimeoutError, match='did not reach status "ACTIVE"'):
+        await client.wait_for_job(
+            {**PROFILE, "jobId": "JOB00123", "jobName": "TESTJOB", "status": "ACTIVE", "attempts": 10_000, "delayMs": 1}
+        )
+    # Capped at 60 attempts regardless of what was asked for, and every
+    # sleep between them is clamped up to the 1-second floor.
+    assert len(sleeps) == 59
+    assert all(delay >= 1.0 for delay in sleeps)
