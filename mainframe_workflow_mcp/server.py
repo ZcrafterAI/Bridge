@@ -97,7 +97,12 @@ def main() -> None:
     idle_sweep(_store, config.IDLE_DAYS)
     archive_sweep(_store, config.ARCHIVE_DIR, config.RETENTION_DAYS)
     register_zcrafter_tools(mcp, _request_manager, build_executor())
-    mcp.run()
+    mcp.run(
+        transport=config.MCP_TRANSPORT,
+        host=config.MCP_HOST,
+        port=config.MCP_PORT,
+        path=config.MCP_PATH,
+    )
 
 
 if __name__ == "__main__":

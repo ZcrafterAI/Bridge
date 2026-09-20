@@ -46,19 +46,11 @@ The credential resolver reads your mainframe password from your OS keychain at r
 python -m mainframe_workflow_mcp.server
 ```
 
-It should start and wait silently. Press `Ctrl+C`. Errors? See [Troubleshooting](#troubleshooting).
+Bridge runs as an MCP server over **Streamable HTTP**, listening on `0.0.0.0:8000/mcp` by default (see [Configuration](#configuration) to change host/port/path). It's meant to be reached by the ZCrafter backend's MCP client, not spawned per-session by a coding assistant. Press `Ctrl+C` to stop it. Errors? See [Troubleshooting](#troubleshooting).
 
-### 4. Connect Claude Code
+### 4. Point backend at it
 
-From inside the `Bridge` folder:
-
-```bash
-claude mcp add mainframe-workflow -- "$(pwd)/.venv/bin/python" -m mainframe_workflow_mcp.server
-```
-
-Windows: use `.venv\Scripts\python.exe`.
-
-Verify with `claude mcp list` — you want `mainframe-workflow: ✔ Connected`.
+Set backend's MCP server URL to `http://<bridge-host>:8000/mcp` (in-cluster service DNS name when running in KinD, `localhost` for local dev).
 
 ### 5. Install the skill
 
