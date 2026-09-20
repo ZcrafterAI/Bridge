@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any, Awaitable, Callable, Optional
 from uuid import uuid4
 from fastmcp.tools import Tool
+from mcp.types import ToolAnnotations
 from ._toolbox import LocalToolExecutor, list_tool_definitions
 
 _TYPE_MAP: dict[str, Any] = {
@@ -74,5 +75,15 @@ def register_zcrafter_tools(mcp, executor: LocalToolExecutor) -> None:
 
         impl = _make_impl(tool_name, executor)
         handler = _build_function(tool_name, input_schema, impl)
-        tool = Tool.from_function(handler, name=tool_name, description=definition["description"])
+        # Standard MCP hint, not a bespoke field: backend's tool dispatch
+        # reads this to decide direct-call vs. approval-gate, so it has to
+        # be the real annotation, not just the "approval" string in our own
+        # tool catalog (which stays too, for zowe.tools.search/capabilities.list).
+        tool_annotations = ToolAnnotations(
+            readOnlyHint=approval == "never",
+            destructiveHint=approval == "required",
+        )
+        tool = Tool.from_function(
+            handler, name=tool_name, description=definition["description"], annotations=tool_annotations,
+        )
         mcp.add_tool(tool)

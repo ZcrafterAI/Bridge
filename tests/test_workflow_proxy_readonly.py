@@ -30,6 +30,11 @@ async def test_every_read_only_zcrafter_tool_gets_registered_with_matching_requi
         assert definition["name"] in tools, f"{definition['name']} was not registered"
         exposed_required = set(tools[definition["name"]].inputSchema.get("required", []))
         assert exposed_required == set(definition["inputSchema"].get("required", []))
+        # backend's tool dispatch reads this standard MCP hint to decide
+        # direct-call vs. approval-gate -- must actually be set, not just
+        # implied by our own "approval" field in the tool catalog.
+        assert tools[definition["name"]].annotations.read_only_hint is True
+        assert tools[definition["name"]].annotations.destructive_hint is False
 
 @pytest.mark.anyio
 async def test_read_only_tool_call_reaches_executor():

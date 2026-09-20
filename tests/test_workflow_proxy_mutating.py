@@ -23,6 +23,19 @@ async def test_mutating_tool_schema_has_no_request_id():
     assert "request_id" not in tools["member.patch"].inputSchema.get("required", [])
 
 @pytest.mark.anyio
+async def test_mutating_tool_is_not_marked_read_only():
+    # This is what backend's tool dispatch actually keys off of to decide
+    # whether to hit the approval gate -- not the "request_id" schema shape.
+    mcp = FastMCP("test")
+    register_zcrafter_tools(mcp, RecordingExecutor())
+
+    async with Client(mcp) as client:
+        tools = {t.name: t for t in await client.list_tools()}
+
+    assert tools["member.patch"].annotations.read_only_hint is False
+    assert tools["member.patch"].annotations.destructive_hint is True
+
+@pytest.mark.anyio
 async def test_mutating_tool_call_reaches_executor_directly():
     # Approval gating is backend's job, one hop up (see docs/architecture.md);
     # bridge no longer has a request/spec/plan gate in front of mutating tools.

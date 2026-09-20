@@ -4,6 +4,13 @@ import pytest
 from mainframe_workflow_mcp import config
 from mainframe_workflow_mcp.credentials import resolve_credentials, CredentialResolutionError
 
+# These tests exercise the "resolver" path specifically and must not depend
+# on whatever CREDENTIAL_SOURCE happens to be set in the developer's real
+# .env (e.g. "env", once real Xplore credentials are configured there).
+@pytest.fixture(autouse=True)
+def _resolver_source(monkeypatch):
+    monkeypatch.setattr(config, "CREDENTIAL_SOURCE", "resolver")
+
 def test_resolve_credentials_parses_resolver_output(monkeypatch):
     def fake_run(args, capture_output, text, timeout):
         return subprocess.CompletedProcess(

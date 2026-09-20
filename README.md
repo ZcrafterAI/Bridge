@@ -137,7 +137,7 @@ If your `ZOSMF_HOST` points at [IBM Z Xplore](https://ibm.com/z/resources/zxplor
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                    # 47 tests
+pytest                                    # 48 tests
 cd credential-resolver && npm test        # 8 tests
 ```
 
