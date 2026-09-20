@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Awaitable, Callable, Optional
 from uuid import uuid4
-from fastmcp.tools.tool import Tool
+from fastmcp.tools import Tool
 from ._toolbox import LocalToolExecutor, list_tool_definitions
 from .requests import RequestManager
 from .action_log_sink import current_request_id
