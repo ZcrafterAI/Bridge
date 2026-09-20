@@ -23,3 +23,19 @@ CREDENTIAL_RESOLVER_PATH = Path(
         PROJECT_ROOT / "credential-resolver" / "dist" / "resolver.js",
     )
 )
+
+# Two credential sources:
+#   "resolver" (default) — shells out to credential-resolver, which reads a
+#       local Zowe team config + the OS keychain. Fine for a developer's own
+#       machine; there is no OS keychain inside a container.
+#   "env" — reads ZOSMF_* below directly, meant for KinD/containers, where
+#       these come from a mounted K8s Secret rather than a real env file.
+CREDENTIAL_SOURCE = os.environ.get("MAINFRAME_WORKFLOW_CREDENTIAL_SOURCE", "resolver")
+ZOSMF_HOST = os.environ.get("MAINFRAME_WORKFLOW_ZOSMF_HOST", "")
+ZOSMF_PORT = os.environ.get("MAINFRAME_WORKFLOW_ZOSMF_PORT", "443")
+ZOSMF_USER = os.environ.get("MAINFRAME_WORKFLOW_ZOSMF_USER", "")
+ZOSMF_PASSWORD = os.environ.get("MAINFRAME_WORKFLOW_ZOSMF_PASSWORD", "")
+ZOSMF_PROTOCOL = os.environ.get("MAINFRAME_WORKFLOW_ZOSMF_PROTOCOL", "https")
+ZOSMF_REJECT_UNAUTHORIZED = os.environ.get(
+    "MAINFRAME_WORKFLOW_ZOSMF_REJECT_UNAUTHORIZED", "true"
+).strip().lower() not in ("false", "0", "no")

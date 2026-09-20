@@ -54,4 +54,7 @@ This is deliberate: the human-in-the-loop gate is backend's approval-gate state 
 
 ## Credentials
 
-Resolved once per executor build: Python runs `credential-resolver/dist/resolver.js`, which prints a JSON profile to stdout by reading the same vault Zowe's own CLI uses. Nothing from the vault is written to disk by bridge.
+Two sources, picked by `MAINFRAME_WORKFLOW_CREDENTIAL_SOURCE`:
+
+- `resolver` (default, local dev): Python runs `credential-resolver/dist/resolver.js`, which prints a JSON profile to stdout by reading the same vault Zowe's own CLI uses. Nothing from the vault is written to disk by bridge.
+- `env` (containers/KinD): reads `MAINFRAME_WORKFLOW_ZOSMF_*` directly. There is no OS keychain inside a container for the Node resolver to read, so this is the path the Docker image and KinD manifests use — those vars come from a mounted K8s Secret, not a real `.env` file.

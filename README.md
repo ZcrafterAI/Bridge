@@ -18,7 +18,7 @@ Bridge is a network service: the ZCrafter backend is its MCP client, reaching it
 ### Before you start
 
 - **Python 3.11+** and **Node.js 20+**
-- A working **Zowe CLI profile**. Test it: `zowe zosmf check status`. If that fails, fix Zowe first — Bridge reads the same profile.
+- Either a working **Zowe CLI profile** (local dev — test it with `zowe zosmf check status`) or a z/OSMF host/user/password to set directly as env vars (containers/KinD, e.g. against IBM Z Xplore). See [Configuration](#configuration).
 
 ### 1. Get the code
 
@@ -37,7 +37,7 @@ pip install -r requirements.txt
 cd credential-resolver && npm install && npm run build && cd ..
 ```
 
-The credential resolver reads your mainframe password from your OS keychain at run time. **No password is stored in this repo.**
+By default the credential resolver reads your mainframe password from your OS keychain at run time. **No password is stored in this repo.** Running in a container instead? Skip the resolver build and set `MAINFRAME_WORKFLOW_CREDENTIAL_SOURCE=env` — see [Configuration](#configuration).
 
 ### 3. Check it starts
 
@@ -82,7 +82,9 @@ Copy `.env.example` to `.env` to change defaults.
 
 | Variable | Default | |
 |---|---|---|
-| `MAINFRAME_WORKFLOW_ZOWE_PROFILE` | `default` | Which Zowe profile to use |
+| `MAINFRAME_WORKFLOW_CREDENTIAL_SOURCE` | `resolver` | `resolver` (local Zowe profile + OS keychain) or `env` (below — containers/KinD) |
+| `MAINFRAME_WORKFLOW_ZOWE_PROFILE` | `default` | Which Zowe profile to use (`resolver` source only) |
+| `MAINFRAME_WORKFLOW_ZOSMF_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `_PROTOCOL` / `_REJECT_UNAUTHORIZED` | — | Direct z/OSMF connection (`env` source only) — e.g. your IBM Z Xplore credentials |
 | `MAINFRAME_WORKFLOW_DB_PATH` | `./mainframe_workflow_mcp/state.db` | Where the action log is stored |
 | `MAINFRAME_WORKFLOW_APIML_BASE_PATH` | — | Set if z/OSMF is behind API ML |
 | `MAINFRAME_WORKFLOW_MCP_TRANSPORT` | `http` | MCP transport (Streamable HTTP) |
@@ -100,6 +102,8 @@ Copy `.env.example` to `.env` to change defaults.
 
 **`Resolved profile is missing host/user/password`** — credentials aren't in your OS vault. Re-run `zowe config secure`.
 
+**`CREDENTIAL_SOURCE=env requires ZOSMF_HOST, _USER and _PASSWORD`** — one of those three env vars is empty; there's no keychain fallback in `env` mode.
+
 **Backend can't reach bridge** — confirm bridge is listening on the configured host/port (`curl -X POST http://<bridge-host>:8000/mcp ...`) and that backend's MCP server URL points at the same `/mcp` path.
 
 ---
@@ -108,7 +112,7 @@ Copy `.env.example` to `.env` to change defaults.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                    # 42 tests
+pytest                                    # 45 tests
 cd credential-resolver && npm test        # 8 tests
 ```
 

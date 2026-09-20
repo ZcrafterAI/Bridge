@@ -25,6 +25,29 @@ class ZosmfCredentials:
 
 
 def resolve_credentials(profile_name: str | None = None) -> ZosmfCredentials:
+    if config.CREDENTIAL_SOURCE == "env":
+        return _resolve_from_env()
+    return _resolve_from_node_resolver(profile_name)
+
+
+def _resolve_from_env() -> ZosmfCredentials:
+    if not config.ZOSMF_HOST or not config.ZOSMF_USER or not config.ZOSMF_PASSWORD:
+        raise CredentialResolutionError(
+            "MAINFRAME_WORKFLOW_CREDENTIAL_SOURCE=env requires "
+            "MAINFRAME_WORKFLOW_ZOSMF_HOST, _USER and _PASSWORD to be set"
+        )
+    return ZosmfCredentials(
+        host=config.ZOSMF_HOST,
+        port=int(config.ZOSMF_PORT),
+        user=config.ZOSMF_USER.strip(),
+        password=config.ZOSMF_PASSWORD.strip(),
+        protocol=config.ZOSMF_PROTOCOL,
+        reject_unauthorized=config.ZOSMF_REJECT_UNAUTHORIZED,
+        base_path=config.APIML_BASE_PATH or None,
+    )
+
+
+def _resolve_from_node_resolver(profile_name: str | None) -> ZosmfCredentials:
     args = ["node", str(config.CREDENTIAL_RESOLVER_PATH)]
     if profile_name:
         args.append(profile_name)

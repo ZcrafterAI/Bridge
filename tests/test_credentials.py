@@ -1,6 +1,7 @@
 import json
 import subprocess
 import pytest
+from mainframe_workflow_mcp import config
 from mainframe_workflow_mcp.credentials import resolve_credentials, CredentialResolutionError
 
 def test_resolve_credentials_parses_resolver_output(monkeypatch):
@@ -58,3 +59,45 @@ def test_resolve_credentials_strips_whitespace_on_secrets(monkeypatch):
     creds = resolve_credentials()
     assert creds.user == "IBMUSER"
     assert creds.password == "secret"
+
+
+def test_resolve_credentials_from_env_when_source_is_env(monkeypatch):
+    monkeypatch.setattr(config, "CREDENTIAL_SOURCE", "env")
+    monkeypatch.setattr(config, "ZOSMF_HOST", "xplore.example.com")
+    monkeypatch.setattr(config, "ZOSMF_PORT", "10443")
+    monkeypatch.setattr(config, "ZOSMF_USER", " IBMUSER ")
+    monkeypatch.setattr(config, "ZOSMF_PASSWORD", " secret ")
+    monkeypatch.setattr(config, "ZOSMF_PROTOCOL", "https")
+    monkeypatch.setattr(config, "ZOSMF_REJECT_UNAUTHORIZED", False)
+    monkeypatch.setattr(config, "APIML_BASE_PATH", "/ibmzosmf/api/v1")
+
+    creds = resolve_credentials()
+
+    assert creds.host == "xplore.example.com"
+    assert creds.port == 10443
+    assert creds.user == "IBMUSER"
+    assert creds.password == "secret"
+    assert creds.reject_unauthorized is False
+    assert creds.base_path == "/ibmzosmf/api/v1"
+
+
+def test_resolve_credentials_from_env_never_shells_out(monkeypatch):
+    def fail_run(*args, **kwargs):
+        raise AssertionError("env credential source must not invoke the node resolver")
+    monkeypatch.setattr(subprocess, "run", fail_run)
+    monkeypatch.setattr(config, "CREDENTIAL_SOURCE", "env")
+    monkeypatch.setattr(config, "ZOSMF_HOST", "xplore.example.com")
+    monkeypatch.setattr(config, "ZOSMF_USER", "IBMUSER")
+    monkeypatch.setattr(config, "ZOSMF_PASSWORD", "secret")
+
+    resolve_credentials()
+
+
+def test_resolve_credentials_from_env_raises_when_incomplete(monkeypatch):
+    monkeypatch.setattr(config, "CREDENTIAL_SOURCE", "env")
+    monkeypatch.setattr(config, "ZOSMF_HOST", "")
+    monkeypatch.setattr(config, "ZOSMF_USER", "")
+    monkeypatch.setattr(config, "ZOSMF_PASSWORD", "")
+
+    with pytest.raises(CredentialResolutionError, match="ZOSMF_HOST"):
+        resolve_credentials()
