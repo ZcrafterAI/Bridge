@@ -19,8 +19,8 @@ async def test_mutating_tool_schema_has_no_request_id():
     async with Client(mcp) as client:
         tools = {t.name: t for t in await client.list_tools()}
 
-    assert "request_id" not in tools["member.patch"].inputSchema.get("properties", {})
-    assert "request_id" not in tools["member.patch"].inputSchema.get("required", [])
+    assert "request_id" not in tools["member.patch"].input_schema.get("properties", {})
+    assert "request_id" not in tools["member.patch"].input_schema.get("required", [])
 
 @pytest.mark.anyio
 async def test_mutating_tool_is_not_marked_read_only():
@@ -87,7 +87,7 @@ async def test_every_mutating_zcrafter_tool_is_registered_with_no_request_id():
         if definition["approval"] != "required":
             continue
         assert definition["name"] in tools, f"{definition['name']} was not registered"
-        schema = tools[definition["name"]].inputSchema
+        schema = tools[definition["name"]].input_schema
         assert "request_id" not in schema.get("properties", {}), (
             f"{definition['name']} should not require request_id anymore"
         )

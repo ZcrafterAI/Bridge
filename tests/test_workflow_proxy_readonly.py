@@ -28,7 +28,7 @@ async def test_every_read_only_zcrafter_tool_gets_registered_with_matching_requi
         if definition["approval"] == "required":
             continue
         assert definition["name"] in tools, f"{definition['name']} was not registered"
-        exposed_required = set(tools[definition["name"]].inputSchema.get("required", []))
+        exposed_required = set(tools[definition["name"]].input_schema.get("required", []))
         assert exposed_required == set(definition["inputSchema"].get("required", []))
         # backend's tool dispatch reads this standard MCP hint to decide
         # direct-call vs. approval-gate -- must actually be set, not just
