@@ -3,7 +3,7 @@
 ## Where to start
 
 1. Read the [README](README.md) for the product story, diagrams, and install steps.
-2. Read [docs/architecture.md](docs/architecture.md) for the folder map and request lifecycle.
+2. Read [docs/architecture.md](docs/architecture.md) for the folder map and how approval works.
 3. The server entrypoint is `python -m mainframe_workflow_mcp.server`.
 
 ## Dev setup
@@ -28,7 +28,7 @@ pytest -v
 cd credential-resolver && npm test && cd ..
 ```
 
-Unit tests do not need a live mainframe. The optional live smoke script is `scripts/live_zowe_sdk_tools.py` (needs real z/OSMF credentials).
+Unit tests do not need a live mainframe. There is no live-mainframe smoke script in this repo yet (a pre-existing doc referenced one under `scripts/`; that directory doesn't exist) — testing against a real z/OSMF target currently means running the server itself against Z Xplore.
 
 ## Local-only paths (not in git)
 

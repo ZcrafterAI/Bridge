@@ -7,9 +7,9 @@ Give AI Agents real access to your mainframe and keep it from changing anything 
 
 ## What's an MCP server?
 
-MCP is how AI Agents talks to outside systems. An MCP server hands AI a set of tools it can call. Bridge is an MCP server whose tools are your mainframe - datasets, members, jobs, spool, with an approval gate in front of anything destructive.
+MCP is how AI Agents talks to outside systems. An MCP server hands AI a set of tools it can call. Bridge is an MCP server whose tools are your mainframe - datasets, members, jobs, spool.
 
-Install it once, point Claude Code/Codex at it, then just talk to Claude.
+Bridge is a network service: the ZCrafter backend is its MCP client, reaching it over Streamable HTTP. Bridge exposes each tool with an `approval: never|required` flag so backend knows which calls need a human's yes before backend ever invokes them — bridge itself doesn't gate anything; it executes what it's asked and logs the outcome. See [How approval works](#how-approval-works).
 
 ---
 
@@ -18,7 +18,6 @@ Install it once, point Claude Code/Codex at it, then just talk to Claude.
 ### Before you start
 
 - **Python 3.11+** and **Node.js 20+**
-- **Claude Code** — [install guide](https://docs.claude.com/en/docs/claude-code)
 - A working **Zowe CLI profile**. Test it: `zowe zosmf check status`. If that fails, fix Zowe first — Bridge reads the same profile.
 
 ### 1. Get the code
@@ -52,28 +51,15 @@ Bridge runs as an MCP server over **Streamable HTTP**, listening on `0.0.0.0:800
 
 Set backend's MCP server URL to `http://<bridge-host>:8000/mcp` (in-cluster service DNS name when running in KinD, `localhost` for local dev).
 
-### 5. Install the skill
-
-```bash
-mkdir -p ~/.claude/skills
-cp -r .claude/skills/mainframe-workflow ~/.claude/skills/
-```
-
 ---
 
-## How the gate works
+## How approval works
 
-**Reading is free.** Listing datasets, reading members, checking jobs, searching spool — no approval needed.
+**Reading is free.** Every tool tagged `approval: "never"` — listing datasets, reading members, checking jobs, searching spool — runs immediately, no gate.
 
-**Changing anything is gated.** Before Claude can write a member, submit a job, or delete a dataset, it must:
+**Changing anything is backend's call.** Tools tagged `approval: "required"` — writing a member, submitting a job, deleting a dataset — still run immediately when bridge receives them; bridge trusts its caller. The actual human-in-the-loop gate lives in backend's approval-gate state, which gets a user's explicit yes (via a correlated pending-action REST POST) before it ever calls bridge for one of these. Call `zowe.capabilities.list` to see which tools require approval.
 
-1. Open a request
-2. Write a **spec** — what changes and why — and get your explicit yes
-3. Write a **plan** — the exact steps — and get your explicit yes
-
-Editing the spec after approval un-approves the plan too. Every mutation is logged with its inputs; passwords are redacted, diffs are hashed.
-
-An agent that skips a step gets `PLAN_NOT_APPROVED` instead of access to your system.
+Every call, gated or not, is logged to bridge's local action log: tool, target, status, and a sanitized copy of the input (passwords redacted, diffs hashed, bulk content truncated) — never the full job/member content, and never an approval decision, since bridge doesn't make one.
 
 ---
 
@@ -86,7 +72,7 @@ An agent that skips a step gets `PLAN_NOT_APPROVED` instead of access to your sy
 | **Jobs** | list, status, submit, cancel, purge, wait, JCL, spool |
 | **Other** | verify connection, list profiles, search the tool catalog |
 
-Large reads (`member.read`, `dataset.read`, `job.output`, `job.spool.read`) accept `searchText`, `maxLines` and `regex` — so Claude finds one line in a 40,000-line job log instead of pulling the whole thing into context.
+Large reads (`member.read`, `dataset.read`, `job.output`, `job.spool.read`) accept `searchText`, `maxLines` and `regex` — so the agent finds one line in a 40,000-line job log instead of pulling the whole thing into context.
 
 ---
 
@@ -97,10 +83,12 @@ Copy `.env.example` to `.env` to change defaults.
 | Variable | Default | |
 |---|---|---|
 | `MAINFRAME_WORKFLOW_ZOWE_PROFILE` | `default` | Which Zowe profile to use |
-| `MAINFRAME_WORKFLOW_DB_PATH` | `./mainframe_workflow_mcp/state.db` | Where requests are stored |
-| `MAINFRAME_WORKFLOW_IDLE_DAYS` | `14` | Abandon untouched requests after |
-| `MAINFRAME_WORKFLOW_RETENTION_DAYS` | `90` | Archive finished requests after |
+| `MAINFRAME_WORKFLOW_DB_PATH` | `./mainframe_workflow_mcp/state.db` | Where the action log is stored |
 | `MAINFRAME_WORKFLOW_APIML_BASE_PATH` | — | Set if z/OSMF is behind API ML |
+| `MAINFRAME_WORKFLOW_MCP_TRANSPORT` | `http` | MCP transport (Streamable HTTP) |
+| `MAINFRAME_WORKFLOW_MCP_HOST` | `0.0.0.0` | Bind host |
+| `MAINFRAME_WORKFLOW_MCP_PORT` | `8000` | Bind port |
+| `MAINFRAME_WORKFLOW_MCP_PATH` | `/mcp` | HTTP path backend's MCP client connects to |
 
 ---
 
@@ -112,7 +100,7 @@ Copy `.env.example` to `.env` to change defaults.
 
 **`Resolved profile is missing host/user/password`** — credentials aren't in your OS vault. Re-run `zowe config secure`.
 
-**Claude says a tool isn't allowed** — approve it when prompted, or check `claude mcp list`.
+**Backend can't reach bridge** — confirm bridge is listening on the configured host/port (`curl -X POST http://<bridge-host>:8000/mcp ...`) and that backend's MCP server URL points at the same `/mcp` path.
 
 ---
 
@@ -120,7 +108,7 @@ Copy `.env.example` to `.env` to change defaults.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                    # 87 tests
+pytest                                    # 42 tests
 cd credential-resolver && npm test        # 8 tests
 ```
 

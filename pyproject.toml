@@ -1,7 +1,7 @@
 [project]
 name = "mainframe-mcp"
 version = "0.1.0"
-description = "MCP server that gates mainframe/z/OS changes behind spec and plan approval"
+description = "MCP server exposing typed mainframe/z/OS tools over Streamable HTTP for the ZCrafter backend"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }

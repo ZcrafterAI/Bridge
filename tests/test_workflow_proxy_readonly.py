@@ -15,15 +15,11 @@ class FakeExecutor:
         self.calls.append(call)
         return {"status": "ok", "data": {"echo": call["input"]}}
 
-class FakeRequestManager:
-    def get_request(self, request_id):
-        return None  # unused by read-only tools
-
 @pytest.mark.anyio
 async def test_every_read_only_zcrafter_tool_gets_registered_with_matching_required_fields():
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, FakeRequestManager(), executor)
+    register_zcrafter_tools(mcp, executor)
 
     async with Client(mcp) as client:
         tools = {t.name: t for t in await client.list_tools()}
@@ -36,10 +32,10 @@ async def test_every_read_only_zcrafter_tool_gets_registered_with_matching_requi
         assert exposed_required == set(definition["inputSchema"].get("required", []))
 
 @pytest.mark.anyio
-async def test_read_only_tool_call_reaches_executor_with_no_request_id_needed():
+async def test_read_only_tool_call_reaches_executor():
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, FakeRequestManager(), executor)
+    register_zcrafter_tools(mcp, executor)
 
     call_input = {"profileName": "default", "pattern": "IBMUSER.**"}
     async with Client(mcp) as client:
@@ -50,13 +46,12 @@ async def test_read_only_tool_call_reaches_executor_with_no_request_id_needed():
     assert echoed["profileName"] == "default"
     assert echoed["pattern"] == "IBMUSER.**"
     assert executor.calls[0]["name"] == "dataset.list"
-    assert "approved" not in executor.calls[0]
 
 @pytest.mark.anyio
 async def test_catalog_tool_zowe_tools_search_is_registered():
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, FakeRequestManager(), executor)
+    register_zcrafter_tools(mcp, executor)
 
     async with Client(mcp) as client:
         tools = {t.name for t in await client.list_tools()}
@@ -76,7 +71,7 @@ def test_register_zcrafter_tools_raises_on_unknown_approval_value(monkeypatch):
     mcp = FastMCP("test")
     executor = FakeExecutor()
     with pytest.raises(ValueError, match="Unknown approval value"):
-        register_zcrafter_tools(mcp, FakeRequestManager(), executor)
+        register_zcrafter_tools(mcp, executor)
 
 @pytest.mark.anyio
 async def test_integer_argument_for_number_typed_schema_stays_int(monkeypatch):
@@ -94,7 +89,7 @@ async def test_integer_argument_for_number_typed_schema_stays_int(monkeypatch):
 
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, FakeRequestManager(), executor)
+    register_zcrafter_tools(mcp, executor)
 
     async with Client(mcp) as client:
         await client.call_tool("fake.number.tool", {"spoolId": 2})
