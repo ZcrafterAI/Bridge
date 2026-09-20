@@ -108,6 +108,23 @@ Copy `.env.example` to `.env` to change defaults.
 
 ---
 
+## Running in a container
+
+The image runs with `MAINFRAME_WORKFLOW_CREDENTIAL_SOURCE=env` (no Node/keytar — there's no OS keychain in a container), so pass your z/OSMF connection directly:
+
+```bash
+docker build -t zcrafter-bridge .
+docker run -p 8000:8000 \
+  -e MAINFRAME_WORKFLOW_ZOSMF_HOST=<xplore-host> \
+  -e MAINFRAME_WORKFLOW_ZOSMF_USER=<user> \
+  -e MAINFRAME_WORKFLOW_ZOSMF_PASSWORD=<password> \
+  zcrafter-bridge
+```
+
+In KinD, those three come from a mounted K8s Secret instead of literal `-e` flags.
+
+---
+
 ## Development
 
 ```bash
