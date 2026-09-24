@@ -1,8 +1,8 @@
 import json
 import subprocess
 import pytest
-from mainframe_workflow_mcp import config
-from mainframe_workflow_mcp.credentials import resolve_credentials, CredentialResolutionError
+from mainframe_workflow_mcp import config, credentials
+from mainframe_workflow_mcp.credentials import resolve_credentials, resolve_from_request_headers, CredentialResolutionError
 
 # These tests exercise the "resolver" path specifically and must not depend
 # on whatever CREDENTIAL_SOURCE happens to be set in the developer's real
@@ -108,3 +108,63 @@ def test_resolve_credentials_from_env_raises_when_incomplete(monkeypatch):
 
     with pytest.raises(CredentialResolutionError, match="ZOSMF_HOST"):
         resolve_credentials()
+
+
+# --- resolve_from_request_headers (CREDENTIAL_SOURCE=request_headers, multi-tenant) ---
+
+def _headers(**overrides):
+    base = {
+        "x-zcrafter-connection-id": "conn-1",
+        "x-zcrafter-zosmf-host": "xplore.example.com",
+        "x-zcrafter-zosmf-port": "10443",
+        "x-zcrafter-zosmf-user": "IBMUSER",
+        "x-zcrafter-zosmf-password": "secret",
+        "x-zcrafter-zosmf-protocol": "https",
+        "x-zcrafter-zosmf-reject-unauthorized": "false",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_resolve_from_request_headers_parses_all_fields(monkeypatch):
+    monkeypatch.setattr(credentials, "get_http_headers", lambda: _headers())
+    connection_id, creds = resolve_from_request_headers()
+    assert connection_id == "conn-1"
+    assert creds.host == "xplore.example.com"
+    assert creds.port == 10443
+    assert creds.user == "IBMUSER"
+    assert creds.password == "secret"
+    assert creds.reject_unauthorized is False
+
+
+def test_resolve_from_request_headers_defaults_port_and_protocol(monkeypatch):
+    headers = _headers()
+    del headers["x-zcrafter-zosmf-port"]
+    del headers["x-zcrafter-zosmf-protocol"]
+    del headers["x-zcrafter-zosmf-reject-unauthorized"]
+    monkeypatch.setattr(credentials, "get_http_headers", lambda: headers)
+    _, creds = resolve_from_request_headers()
+    assert creds.port == 443
+    assert creds.protocol == "https"
+    assert creds.reject_unauthorized is True
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["x-zcrafter-connection-id", "x-zcrafter-zosmf-host", "x-zcrafter-zosmf-user", "x-zcrafter-zosmf-password"],
+)
+def test_resolve_from_request_headers_raises_when_required_header_missing(monkeypatch, missing):
+    headers = _headers()
+    del headers[missing]
+    monkeypatch.setattr(credentials, "get_http_headers", lambda: headers)
+    with pytest.raises(CredentialResolutionError):
+        resolve_from_request_headers()
+
+
+def test_resolve_from_request_headers_no_live_request_raises(monkeypatch):
+    # get_http_headers() itself never raises (returns {} with no active
+    # request per its own docstring) -- this just confirms that flows
+    # through as a clear CredentialResolutionError, not a KeyError.
+    monkeypatch.setattr(credentials, "get_http_headers", lambda: {})
+    with pytest.raises(CredentialResolutionError):
+        resolve_from_request_headers()

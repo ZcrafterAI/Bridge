@@ -36,7 +36,7 @@ async def test_mutating_call_reaches_executor_and_is_persisted_to_the_real_sqlit
     store = ActionLogStore(db_path)
     mcp = FastMCP("e2e")
     executor = RecordingExecutor(ActionLogSink(store))
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     # No request/spec/plan workflow anymore: a mutating call goes straight
     # through, the same as a read-only one -- backend is expected to have

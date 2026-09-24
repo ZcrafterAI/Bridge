@@ -19,7 +19,7 @@ class FakeExecutor:
 async def test_every_read_only_zcrafter_tool_gets_registered_with_matching_required_fields():
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     async with Client(mcp) as client:
         tools = {t.name: t for t in await client.list_tools()}
@@ -40,7 +40,7 @@ async def test_every_read_only_zcrafter_tool_gets_registered_with_matching_requi
 async def test_read_only_tool_call_reaches_executor():
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     call_input = {"profileName": "default", "pattern": "IBMUSER.**"}
     async with Client(mcp) as client:
@@ -56,7 +56,7 @@ async def test_read_only_tool_call_reaches_executor():
 async def test_catalog_tool_zowe_tools_search_is_registered():
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     async with Client(mcp) as client:
         tools = {t.name for t in await client.list_tools()}
@@ -76,7 +76,7 @@ def test_register_zcrafter_tools_raises_on_unknown_approval_value(monkeypatch):
     mcp = FastMCP("test")
     executor = FakeExecutor()
     with pytest.raises(ValueError, match="Unknown approval value"):
-        register_zcrafter_tools(mcp, executor)
+        register_zcrafter_tools(mcp, lambda: executor)
 
 @pytest.mark.anyio
 async def test_integer_argument_for_number_typed_schema_stays_int(monkeypatch):
@@ -94,7 +94,7 @@ async def test_integer_argument_for_number_typed_schema_stays_int(monkeypatch):
 
     mcp = FastMCP("test")
     executor = FakeExecutor()
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     async with Client(mcp) as client:
         await client.call_tool("fake.number.tool", {"spoolId": 2})

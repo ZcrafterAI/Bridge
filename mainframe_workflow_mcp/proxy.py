@@ -51,19 +51,27 @@ def _build_function(name: str, input_schema: dict[str, Any], impl: Callable[[dic
     return handler
 
 
-def _make_impl(tool_name: str, executor: LocalToolExecutor):
+def _make_impl(tool_name: str, get_executor: Callable[[], LocalToolExecutor]):
     # Approval gating lives in backend now, one hop up from bridge (see
     # docs/architecture.md) — by the time a call reaches here it has already
     # been authorized, whether the tool's contract marks it "never" or
     # "required". Bridge just executes what it's asked and records the
     # outcome; it doesn't second-guess the caller.
+    #
+    # get_executor is called fresh on every invocation, not captured once:
+    # in CREDENTIAL_SOURCE=request_headers mode (multi-tenant), which
+    # executor is correct depends on this specific call's HTTP headers, so
+    # a single captured executor would silently pin every caller to
+    # whichever connection built it first. In CREDENTIAL_SOURCE=env mode
+    # get_executor just returns the one process-wide instance, so this
+    # costs nothing there.
     async def impl(kwargs: dict[str, Any]) -> dict[str, Any]:
         call = {"id": str(uuid4()), "name": tool_name, "input": kwargs, "approved": True}
-        return await executor.execute(call)
+        return await get_executor().execute(call)
     return impl
 
 
-def register_zcrafter_tools(mcp, executor: LocalToolExecutor) -> None:
+def register_zcrafter_tools(mcp, get_executor: Callable[[], LocalToolExecutor]) -> None:
     for definition in list_tool_definitions():
         tool_name = definition["name"]
         input_schema = definition["inputSchema"]
@@ -73,7 +81,7 @@ def register_zcrafter_tools(mcp, executor: LocalToolExecutor) -> None:
                 f"Unknown approval value {approval!r} for tool {tool_name!r} — refusing to guess whether it is mutating"
             )
 
-        impl = _make_impl(tool_name, executor)
+        impl = _make_impl(tool_name, get_executor)
         handler = _build_function(tool_name, input_schema, impl)
         # Standard MCP hint, not a bespoke field: backend's tool dispatch
         # reads this to decide direct-call vs. approval-gate, so it has to

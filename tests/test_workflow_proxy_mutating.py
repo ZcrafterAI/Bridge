@@ -14,7 +14,7 @@ class RecordingExecutor:
 @pytest.mark.anyio
 async def test_mutating_tool_schema_has_no_request_id():
     mcp = FastMCP("test")
-    register_zcrafter_tools(mcp, RecordingExecutor())
+    register_zcrafter_tools(mcp, lambda: RecordingExecutor())
 
     async with Client(mcp) as client:
         tools = {t.name: t for t in await client.list_tools()}
@@ -27,7 +27,7 @@ async def test_mutating_tool_is_not_marked_read_only():
     # This is what backend's tool dispatch actually keys off of to decide
     # whether to hit the approval gate -- not the "request_id" schema shape.
     mcp = FastMCP("test")
-    register_zcrafter_tools(mcp, RecordingExecutor())
+    register_zcrafter_tools(mcp, lambda: RecordingExecutor())
 
     async with Client(mcp) as client:
         tools = {t.name: t for t in await client.list_tools()}
@@ -41,7 +41,7 @@ async def test_mutating_tool_call_reaches_executor_directly():
     # bridge no longer has a request/spec/plan gate in front of mutating tools.
     mcp = FastMCP("test")
     executor = RecordingExecutor()
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     async with Client(mcp) as client:
         result = await client.call_tool(
@@ -55,7 +55,7 @@ async def test_mutating_tool_call_reaches_executor_directly():
 async def test_approved_flag_is_always_server_derived_not_model_controlled():
     mcp = FastMCP("test")
     executor = RecordingExecutor()
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     async with Client(mcp) as client:
         await client.call_tool(
@@ -78,7 +78,7 @@ async def test_approved_flag_is_always_server_derived_not_model_controlled():
 async def test_every_mutating_zcrafter_tool_is_registered_with_no_request_id():
     mcp = FastMCP("test")
     executor = RecordingExecutor()
-    register_zcrafter_tools(mcp, executor)
+    register_zcrafter_tools(mcp, lambda: executor)
 
     async with Client(mcp) as client:
         tools = {t.name: t for t in await client.list_tools()}

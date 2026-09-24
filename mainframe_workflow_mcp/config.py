@@ -24,12 +24,19 @@ CREDENTIAL_RESOLVER_PATH = Path(
     )
 )
 
-# Two credential sources:
+# Three credential sources:
 #   "resolver" (default) — shells out to credential-resolver, which reads a
 #       local Zowe team config + the OS keychain. Fine for a developer's own
 #       machine; there is no OS keychain inside a container.
-#   "env" — reads ZOSMF_* below directly, meant for KinD/containers, where
-#       these come from a mounted K8s Secret rather than a real env file.
+#   "env" — reads ZOSMF_* below directly, meant for a single-tenant
+#       KinD/container deployment, where these come from a mounted K8s
+#       Secret rather than a real env file. One credential set for the
+#       whole process, resolved once at startup.
+#   "request_headers" — multi-tenant: each MCP call carries its own
+#       connection's credentials as HTTP headers (see credentials.py's
+#       resolve_from_request_headers and server.py's per-connection
+#       executor cache), since backend now supports more than one z/OSMF
+#       target concurrently. ZOSMF_* below are unused in this mode.
 CREDENTIAL_SOURCE = os.environ.get("MAINFRAME_WORKFLOW_CREDENTIAL_SOURCE", "resolver")
 ZOSMF_HOST = os.environ.get("MAINFRAME_WORKFLOW_ZOSMF_HOST", "")
 ZOSMF_PORT = os.environ.get("MAINFRAME_WORKFLOW_ZOSMF_PORT", "443")
