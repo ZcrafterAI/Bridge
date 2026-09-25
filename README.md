@@ -2,7 +2,7 @@
 
 Give AI Agents real access to your mainframe and keep it from changing anything you haven't approved.
 
-<img width="3000" height="1027" alt="6770AD52-6CF4-4300-9BF8-2D1A6C96FB9C" src="https://github.com/user-attachments/assets/98dc50c8-0752-4c3a-a491-0d8af2311460" />
+<img width="664" height="265" alt="Screenshot 2026-09-24 at 11 58 01 PM" src="https://github.com/user-attachments/assets/ed79d7fa-fc7d-4e8a-be9c-0b06a1376e99" />
 
 
 ## What's an MCP server?
