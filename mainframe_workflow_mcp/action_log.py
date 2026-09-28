@@ -158,11 +158,10 @@ class TransactionLogStore:
                     
                     self._conn.execute(
                         """INSERT INTO transaction_actions 
-                           (action_id, request_id, action_session_id, tool, target, status, summary, input_json, 
-                            started_at, completed_at, created_at, updated_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           (action_id, request_id, action_session_id, tool, target, status, summary, input_json, output_json, error_message, state_before, started_at, completed_at, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (action_id, request_id, session_id, tool, target, self.PENDING, summary, input_json or "", 
-                         _now(), _now(), _now())
+                         None, None, str(state_before), _now(), _now(), _now(), _now())
                     )
                     
                     if state_before:
