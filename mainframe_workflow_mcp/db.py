@@ -3,6 +3,10 @@ import sqlite3
 import threading
 from pathlib import Path
 
+# Enable WAL mode at connection time for crash recovery and concurrent writes
+WAL_CONFIGURED = False
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS requests (
     id TEXT PRIMARY KEY,
@@ -53,6 +57,47 @@ CREATE TABLE IF NOT EXISTS action_log (
     diff_hash TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS action_sessions (
+    session_id TEXT PRIMARY KEY,
+    request_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (request_id) REFERENCES requests(id)
+);
+
+CREATE TABLE IF NOT EXISTS transaction_actions (
+    action_id TEXT PRIMARY KEY,
+    request_id TEXT NOT NULL,
+    action_session_id TEXT NOT NULL,  -- Session ID for idempotency grouping
+    tool TEXT NOT NULL,
+    target TEXT,
+    status TEXT NOT NULL CHECK(status IN ('PENDING','IN_PROGRESS','SUCCESS','FAILURE','ROLLED_BACK')),
+    summary TEXT NOT NULL,
+    input_json TEXT,
+    output_json TEXT,
+    error_message TEXT,
+    state_before JSON,  -- Captured at action start for rollback
+    state_after JSON,   -- Captured at action end if successful
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    
+    FOREIGN KEY (request_id) REFERENCES requests(id),
+    
+    -- Idempotency constraint: same request + session + tool + target = one action
+    UNIQUE(request_id, action_session_id, tool, target)
+    
+    -- Unique constraint for idempotency: same request + tool combination within session has one entry
+    UNIQUE(request_id, action_session_id, tool, target)
+);
+
+CREATE INDEX idx_action_log_request ON action_log(request_id);
+CREATE INDEX idx_transaction_actions_request ON transaction_actions(request_id);
+CREATE INDEX idx_transaction_actions_status ON transaction_actions(status);
+
+-- Index for unique constraint support
+CREATE INDEX idx_transaction_actions_unique ON transaction_actions(request_id, action_session_id);
 """
 
 _REQUEST_COLUMNS = (
@@ -72,6 +117,11 @@ class RequestStore:
         # usable cross-thread, guarded by one coarse re-entrant lock.
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        
+        # Enable WAL mode for crash recovery and concurrent writes
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        WAL_CONFIGURED = True
+        
         self._lock = threading.RLock()
         self._conn.executescript(SCHEMA)
         self._conn.commit()
