@@ -1,7 +1,7 @@
 """The `zcrafter-bridge` command.
 
     zcrafter-bridge                 run the MCP server (what an AI client launches)
-    zcrafter-bridge --demo          run it against a pretend mainframe on this machine
+    zcrafter-bridge --demo          run it against the built-in sandbox system
     zcrafter-bridge approve         approve or reject waiting requests in a terminal
     zcrafter-bridge install-skill   copy the agent skill into ~/.claude/skills
 """
@@ -45,7 +45,7 @@ def install_skill(target_root: Path | None = None) -> int:
 
 
 def _start_demo() -> None:
-    """Point this process at a pretend mainframe, with a store of its own."""
+    """Point this process at the built-in sandbox system, with a store of its own."""
     from .demo import USER, start_demo_mainframe
 
     _, port = start_demo_mainframe()
@@ -62,8 +62,7 @@ def _start_demo() -> None:
     os.environ.setdefault("MAINFRAME_WORKFLOW_DB_PATH", str(scratch / "state.db"))
     os.environ.setdefault("MAINFRAME_WORKFLOW_ARCHIVE_DIR", str(scratch / "archive"))
     print(
-        "[bridge] Demo mode: a pretend mainframe on this machine. Nothing real is touched. "
-        "Try: \"PAYRUN abended last night, find out why and fix it.\"",
+        "[bridge] Sandbox: a built-in practice system on this machine. No real mainframe is contacted.",
         file=sys.stderr, flush=True,
     )
 
@@ -75,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--version", action="version", version=f"zcrafter-bridge {_version()}")
     parser.add_argument("--demo", action="store_true",
-                        help="use a pretend mainframe on this machine instead of a real one")
+                        help="run against the built-in sandbox system; no real mainframe is contacted")
     parser.add_argument("--read-only", action="store_true", help="offer no tool that changes anything")
     parser.add_argument("command", nargs="?", choices=["serve", "approve", "install-skill"], default="serve")
     args = parser.parse_args(argv)

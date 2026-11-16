@@ -110,7 +110,7 @@ def test_demo_mode_points_at_the_pretend_mainframe_and_a_store_of_its_own(monkey
     cli._start_demo()
     assert os.environ["ZOWE_OPT_HOST"] == "127.0.0.1" and os.environ["ZOWE_OPT_PROTOCOL"] == "http"
     assert "zcrafter-bridge-demo-" in os.environ["MAINFRAME_WORKFLOW_DB_PATH"]
-    assert "Nothing real is touched" in capsys.readouterr().err
+    assert "No real mainframe is contacted" in capsys.readouterr().err
     for name in ("MAINFRAME_WORKFLOW_DB_PATH", "MAINFRAME_WORKFLOW_ARCHIVE_DIR", "ZOWE_OPT_HOST", "ZOWE_OPT_PORT",
                  "ZOWE_OPT_USER", "ZOWE_OPT_PASSWORD", "ZOWE_OPT_PROTOCOL", "ZOWE_OPT_REJECT_UNAUTHORIZED"):
         monkeypatch.delenv(name, raising=False)  # do not leak into other tests

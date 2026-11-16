@@ -5,11 +5,17 @@
   </picture>
 </p>
 
-# Zcrafter Bridge
+# Zcrafter Bridge: MCP server for IBM z/OS mainframes
 
 <!-- mcp-name: io.github.ZcrafterAI/bridge -->
 
 Give AI Agents real access to your mainframe and keep it from changing anything you haven't approved.
+
+Zcrafter Bridge is an open-source [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for IBM z/OS. It lets AI agents such as Claude Code, Codex, Cursor, GitHub Copilot in VS Code and Gemini CLI work on a mainframe: datasets and PDS members, COBOL and JCL, batch jobs and spool, z/OS UNIX files, TSO commands and the operator console.
+
+- **48 tools** over z/OSMF and the Zowe SDK. Nothing is installed on the mainframe.
+- **A person approves every change.** The agent cannot approve its own work, and an approval covers only the steps it lists.
+- **One line to install**, on macOS, Linux and Windows.
 
 <img width="664" height="265" alt="Screenshot 2026-09-24 at 11 58 01 PM" src="https://github.com/user-attachments/assets/ed79d7fa-fc7d-4e8a-be9c-0b06a1376e99" />
 
@@ -18,18 +24,6 @@ Give AI Agents real access to your mainframe and keep it from changing anything 
 MCP is how AI Agents talks to outside systems. An MCP server hands AI a set of tools it can call. Bridge is an MCP server whose tools are your mainframe - datasets, members, z/OS UNIX files, jobs, spool, TSO and the operator console, with an approval gate in front of anything that changes the system.
 
 Install it once, point your AI client at it, then just talk.
-
----
-
-## Try it in one minute, no mainframe needed
-
-Bridge ships with a pretend mainframe. With [uv](https://docs.astral.sh/uv/) installed, add the demo to Claude Code:
-
-```bash
-claude mcp add bridge-demo -- uvx --from git+https://github.com/ZcrafterAI/Bridge zcrafter-bridge --demo
-```
-
-Then ask: *"PAYRUN abended last night. Find out why and fix it."* The agent finds the failed step, reads the program, and asks you to approve a plan before it changes anything. Nothing real is touched.
 
 ---
 
@@ -49,12 +43,14 @@ uv tool install git+https://github.com/ZcrafterAI/Bridge
 
 Either way you get one command, `zcrafter-bridge`. It needs Python 3.11 or newer, which uv fetches for you. It no longer needs Node.
 
+What the installer does: it finds [uv](https://docs.astral.sh/uv/) (or installs it for your user), then runs `uv tool install`, which puts Bridge and its dependencies in a folder of their own under your home directory. It uses no `sudo` and changes nothing system-wide. You can read it first: [install.sh](install.sh). To remove Bridge: `uv tool uninstall zcrafter-bridge`.
+
 ### Connect your AI client
 
 | Client | How |
 |---|---|
 | **Claude Code** | `claude mcp add zcrafter-bridge -- zcrafter-bridge` |
-| **Codex** | In `~/.codex/config.toml`: `[mcp_servers.zcrafter-bridge]` then `command = "zcrafter-bridge"` |
+| **Codex** | `codex mcp add zcrafter-bridge -- zcrafter-bridge` |
 | **Claude Desktop, Cursor, Gemini CLI** | Add the JSON below to the client's MCP settings |
 | **VS Code** | The same entry under `"servers"` in `.vscode/mcp.json` |
 
@@ -183,12 +179,34 @@ git clone https://github.com/ZcrafterAI/Bridge.git && cd Bridge
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 pytest                                               # 185 tests, no mainframe needed
-python -m mainframe_workflow_mcp.cli --demo          # run from source
+python -m mainframe_workflow_mcp.cli                 # run from source
 ```
 
 `credential-resolver/` is the older Node helper for reading the Zowe keychain. Bridge reads the keychain itself now and only falls back to the helper if you have built it (`cd credential-resolver && npm install && npm run build`).
 
 Architecture notes: [docs/architecture.md](docs/architecture.md). The tool catalog lives in `mainframe_workflow_mcp/toolbox/` and the z/OSMF calls in `mainframe_workflow_mcp/clients/`.
+
+---
+
+## Questions
+
+**What is Zcrafter Bridge?** An MCP server that connects AI agents to an IBM z/OS mainframe through z/OSMF, with a person approving every change.
+
+**Which AI clients work with it?** Any client that speaks MCP over stdio: Claude Code, Claude Desktop, OpenAI Codex, Cursor, VS Code with GitHub Copilot, Gemini CLI and others.
+
+**What does it need on the mainframe?** z/OSMF switched on and a user ID. Nothing is installed on z/OS. It uses your existing Zowe profile, or three environment variables.
+
+**Can the AI change my mainframe without asking?** No. Reading needs no approval. Any change needs a plan you approve, on a channel the agent cannot reach, and only the changes that plan lists can run.
+
+**Does it work with COBOL and JCL?** Yes. It reads and edits members, applies diffs, submits JCL, waits for the job, reads the output, and can show which step failed and with what code.
+
+**How is it different from Zowe CLI?** Zowe CLI is a command line for people. Bridge gives an AI agent the same z/OSMF operations as tools, built on the Zowe SDK, and puts an approval gate and an audit log in front of anything that changes the system.
+
+**Whose permissions does it use?** Yours. Bridge signs in as your user ID, so your site's security rules (RACF, ACF2 or Top Secret) apply to everything the agent does.
+
+**Is it free?** Yes, MIT licensed.
+
+**Who makes it?** [Zcrafter](https://zcrafter.com), which also makes [Cobots](https://cobots.zcrafter.com), a desktop app where a team of AI agents works on your mainframe.
 
 ---
 
