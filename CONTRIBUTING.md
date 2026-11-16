@@ -25,7 +25,7 @@ cp .env.example .env
 2. Commit, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`.
 3. `.github/workflows/release.yml` runs the tests, publishes to PyPI and publishes `server.json` to the official MCP Registry.
 
-One-time setup: on pypi.org add a trusted publisher for the project `zcrafter-bridge` (owner `ZcrafterAI`, repository `Bridge`, workflow `release.yml`, environment `pypi`). No token is stored. After the first PyPI release, the README's install commands can drop `--from git+https://github.com/ZcrafterAI/Bridge` and become `uvx zcrafter-bridge` and `uv tool install zcrafter-bridge`.
+PyPI trusts this repository's `release.yml` through a trusted publisher (owner `ZcrafterAI`, repository `Bridge`, environment `pypi`), so no token is stored anywhere. The registry step signs in with GitHub's identity for this repository.
 
 ## Tests
 

@@ -9,6 +9,10 @@
 
 <!-- mcp-name: io.github.ZcrafterAI/bridge -->
 
+[![PyPI](https://img.shields.io/pypi/v/zcrafter-bridge)](https://pypi.org/project/zcrafter-bridge/)
+[![Tests](https://github.com/ZcrafterAI/Bridge/actions/workflows/test.yml/badge.svg)](https://github.com/ZcrafterAI/Bridge/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
+
 Give AI Agents real access to your mainframe and keep it from changing anything you haven't approved.
 
 Zcrafter Bridge is an open-source [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for IBM z/OS. It lets AI agents such as Claude Code, Codex, Cursor, GitHub Copilot in VS Code and Gemini CLI work on a mainframe: datasets and PDS members, COBOL and JCL, batch jobs and spool, z/OS UNIX files, TSO commands and the operator console.
@@ -38,10 +42,10 @@ curl -fsSL https://raw.githubusercontent.com/ZcrafterAI/Bridge/main/install.sh |
 Or directly with uv, on any system including Windows:
 
 ```bash
-uv tool install git+https://github.com/ZcrafterAI/Bridge
+uv tool install zcrafter-bridge
 ```
 
-Either way you get one command, `zcrafter-bridge`. It needs Python 3.11 or newer, which uv fetches for you. It no longer needs Node.
+Either way you get one command, `zcrafter-bridge`. Bridge is on [PyPI](https://pypi.org/project/zcrafter-bridge/) and in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.ZcrafterAI/bridge) as `io.github.ZcrafterAI/bridge`. To run it with no install step at all, use `uvx zcrafter-bridge` as the command in your client. It needs Python 3.11 or newer, which uv fetches for you. It no longer needs Node.
 
 What the installer does: it finds [uv](https://docs.astral.sh/uv/) (or installs it for your user), then runs `uv tool install`, which puts Bridge and its dependencies in a folder of their own under your home directory. It uses no `sudo` and changes nothing system-wide. You can read it first: [install.sh](install.sh). To remove Bridge: `uv tool uninstall zcrafter-bridge`.
 
