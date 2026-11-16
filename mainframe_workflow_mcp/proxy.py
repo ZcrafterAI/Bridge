@@ -2,9 +2,11 @@ from __future__ import annotations
 from typing import Any, Awaitable, Callable, Optional
 from uuid import uuid4
 from fastmcp.tools import Tool
+from mcp.types import ToolAnnotations
 from ._toolbox import LocalToolExecutor, list_tool_definitions
 from .requests import RequestManager
 from .action_log_sink import current_request_id
+from .plan_steps import find_step, protected_target, remaining_steps
 
 _TYPE_MAP: dict[str, Any] = {
     "string": str,
@@ -67,7 +69,29 @@ def _make_readonly_impl(tool_name: str, executor: LocalToolExecutor):
     return impl
 
 
-def register_zcrafter_tools(mcp, request_manager: RequestManager, executor: LocalToolExecutor) -> None:
+# Changes that cannot be taken back by running them again.
+_DESTRUCTIVE = ("delete", "purge", "cancel", "write", "patch", "rename", "command", "chmod", "migrate")
+
+
+def _annotations(tool_name: str, approval: str) -> ToolAnnotations:
+    """What a client may tell the person about a tool before running it."""
+    if approval == "never":
+        return ToolAnnotations(read_only_hint=True, open_world_hint=True)
+    return ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=any(word in tool_name.lower() for word in _DESTRUCTIVE),
+        open_world_hint=True,
+    )
+
+
+def register_zcrafter_tools(
+    mcp,
+    request_manager: RequestManager,
+    executor: LocalToolExecutor,
+    *,
+    read_only: bool = False,
+    protected: list[str] | None = None,
+) -> None:
     for definition in list_tool_definitions():
         tool_name = definition["name"]
         input_schema = definition["inputSchema"]
@@ -77,7 +101,9 @@ def register_zcrafter_tools(mcp, request_manager: RequestManager, executor: Loca
             impl = _make_readonly_impl(tool_name, executor)
             handler = _build_function(tool_name, input_schema, impl)
         elif approval == "required":
-            impl = _make_mutating_impl(tool_name, request_manager, executor)
+            if read_only:
+                continue  # a read-only server does not offer the tool at all
+            impl = _make_mutating_impl(tool_name, request_manager, executor, protected or [])
             schema_with_request_id = {
                 **input_schema,
                 "properties": {
@@ -92,11 +118,16 @@ def register_zcrafter_tools(mcp, request_manager: RequestManager, executor: Loca
                 f"Unknown approval value {approval!r} for tool {tool_name!r} — refusing to guess whether it is mutating"
             )
 
-        tool = Tool.from_function(handler, name=tool_name, description=definition["description"])
+        tool = Tool.from_function(
+            handler, name=tool_name, description=definition["description"],
+            annotations=_annotations(tool_name, approval),
+        )
         mcp.add_tool(tool)
 
 
-def _make_mutating_impl(tool_name: str, request_manager: RequestManager, executor: LocalToolExecutor):
+def _make_mutating_impl(
+    tool_name: str, request_manager: RequestManager, executor: LocalToolExecutor, protected: list[str],
+):
     async def impl(kwargs: dict[str, Any]) -> dict[str, Any]:
         request_id = kwargs.pop("request_id")
         request = request_manager.get_request(request_id)
@@ -113,13 +144,44 @@ def _make_mutating_impl(tool_name: str, request_manager: RequestManager, executo
                 },
             }
 
+        hit = protected_target(protected, kwargs)
+        if hit:
+            return {
+                "status": "error",
+                "error": {
+                    "code": "PROTECTED_DATASET",
+                    "message": f"{hit[0]} is protected on this server ({hit[1]}) and cannot be changed.",
+                },
+            }
+
+        # The approval covers the plan's steps and nothing else: this call must be one of them.
+        approved = request_manager.approved_plan(request_id)
+        version, steps, uses = approved if approved else (0, [], {})
+        step_index = find_step(steps, uses, tool_name, kwargs)
+        if step_index is None:
+            left = remaining_steps(steps, uses)
+            return {
+                "status": "error",
+                "error": {
+                    "code": "STEP_NOT_IN_PLAN",
+                    "message": (
+                        f"{tool_name} with these arguments is not a step of the approved plan, "
+                        "or that step was already used. To make this change, draft a new plan "
+                        "revision that lists it and ask the person to approve it."
+                    ),
+                    "stepsRemaining": left,
+                },
+            }
+
         token = current_request_id.set(request_id)
         try:
             result = await _call_executor(executor, tool_name, kwargs, approved=True)
         finally:
             current_request_id.reset(token)
 
-        if result.get("status") == "ok" and request["phase"] == "PLAN_APPROVED":
-            request_manager.mark_executing(request_id)
+        if result.get("status") == "ok":
+            request_manager.record_step_use(request_id, version, step_index)
+            if request["phase"] == "PLAN_APPROVED":
+                request_manager.mark_executing(request_id)
         return result
     return impl

@@ -42,6 +42,26 @@ CREATE TABLE IF NOT EXISTS plan_revisions (
     PRIMARY KEY (request_id, version)
 );
 
+CREATE TABLE IF NOT EXISTS approvals (
+    id TEXT PRIMARY KEY,
+    request_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('spec','plan')),
+    version INTEGER NOT NULL,
+    token_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('PENDING','APPROVED','REJECTED','EXPIRED')),
+    via TEXT,
+    created_at TEXT NOT NULL,
+    decided_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS plan_step_uses (
+    use_seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id TEXT NOT NULL,
+    plan_version INTEGER NOT NULL,
+    step_index INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS action_log (
     entry_seq INTEGER PRIMARY KEY AUTOINCREMENT,
     request_id TEXT,
@@ -74,7 +94,14 @@ class RequestStore:
         self._conn.row_factory = sqlite3.Row
         self._lock = threading.RLock()
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Bring a store made by an earlier version up to date."""
+        columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(plan_revisions)")}
+        if "steps_json" not in columns:
+            self._conn.execute("ALTER TABLE plan_revisions ADD COLUMN steps_json TEXT")
 
     def close(self) -> None:
         with self._lock:
@@ -185,18 +212,94 @@ class RequestStore:
             ).fetchone()
             return dict(row) if row else None
 
-    def add_plan_revision(self, request_id: str, version: int, content: str, *, now: str) -> None:
+    def add_plan_revision(
+        self, request_id: str, version: int, content: str, *, now: str, steps_json: str | None = None,
+    ) -> None:
         with self._lock:
             with self._conn:
                 self._conn.execute(
-                    "INSERT INTO plan_revisions (request_id, version, content, created_at) VALUES (?, ?, ?, ?)",
-                    (request_id, version, content, now),
+                    "INSERT INTO plan_revisions (request_id, version, content, steps_json, created_at) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (request_id, version, content, steps_json, now),
                 )
+
+    def get_plan_revision(self, request_id: str, version: int) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT version, content, steps_json, created_at FROM plan_revisions "
+                "WHERE request_id = ? AND version = ?",
+                (request_id, version),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def add_step_use(self, request_id: str, plan_version: int, step_index: int, *, now: str) -> None:
+        with self._lock:
+            with self._conn:
+                self._conn.execute(
+                    "INSERT INTO plan_step_uses (request_id, plan_version, step_index, created_at) "
+                    "VALUES (?, ?, ?, ?)",
+                    (request_id, plan_version, step_index, now),
+                )
+
+    def step_uses(self, request_id: str, plan_version: int) -> dict[int, int]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT step_index, COUNT(*) AS n FROM plan_step_uses "
+                "WHERE request_id = ? AND plan_version = ? GROUP BY step_index",
+                (request_id, plan_version),
+            ).fetchall()
+            return {int(row["step_index"]): int(row["n"]) for row in rows}
+
+    # ---- approvals: a decision only a person can make ----
+
+    def create_approval(
+        self, id: str, request_id: str, kind: str, version: int, token_hash: str, *, now: str,
+    ) -> None:
+        with self._lock:
+            with self._conn:
+                self._conn.execute(
+                    "INSERT INTO approvals (id, request_id, kind, version, token_hash, status, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, 'PENDING', ?)",
+                    (id, request_id, kind, version, token_hash, now),
+                )
+
+    def get_approval(self, id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM approvals WHERE id = ?", (id,)).fetchone()
+            return dict(row) if row else None
+
+    def find_approval(self, request_id: str, kind: str, version: int) -> dict | None:
+        """The newest approval asked for this exact spec or plan version."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM approvals WHERE request_id = ? AND kind = ? AND version = ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (request_id, kind, version),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def list_pending_approvals(self) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM approvals WHERE status = 'PENDING' ORDER BY created_at"
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def decide_approval(self, id: str, status: str, via: str, *, now: str) -> bool:
+        """Record a decision. False when the approval was already decided."""
+        with self._lock:
+            with self._conn:
+                cursor = self._conn.execute(
+                    "UPDATE approvals SET status = ?, via = ?, decided_at = ? "
+                    "WHERE id = ? AND status = 'PENDING'",
+                    (status, via, now, id),
+                )
+                return cursor.rowcount == 1
 
     def latest_plan_revision(self, request_id: str) -> dict | None:
         with self._lock:
             row = self._conn.execute(
-                "SELECT version, content, created_at FROM plan_revisions WHERE request_id = ? ORDER BY version DESC LIMIT 1",
+                "SELECT version, content, steps_json, created_at FROM plan_revisions WHERE request_id = ? ORDER BY version DESC LIMIT 1",
                 (request_id,),
             ).fetchone()
             return dict(row) if row else None
@@ -226,6 +329,8 @@ class RequestStore:
         with self._lock:
             with self._conn:
                 self._conn.execute("DELETE FROM action_log WHERE request_id = ?", (request_id,))
+                self._conn.execute("DELETE FROM approvals WHERE request_id = ?", (request_id,))
+                self._conn.execute("DELETE FROM plan_step_uses WHERE request_id = ?", (request_id,))
                 self._conn.execute("DELETE FROM plan_revisions WHERE request_id = ?", (request_id,))
                 self._conn.execute("DELETE FROM spec_revisions WHERE request_id = ?", (request_id,))
                 self._conn.execute("DELETE FROM clarifications WHERE request_id = ?", (request_id,))

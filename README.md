@@ -7,7 +7,7 @@ Give AI Agents real access to your mainframe and keep it from changing anything 
 
 ## What's an MCP server?
 
-MCP is how AI Agents talks to outside systems. An MCP server hands AI a set of tools it can call. Bridge is an MCP server whose tools are your mainframe - datasets, members, jobs, spool, with an approval gate in front of anything destructive.
+MCP is how AI Agents talks to outside systems. An MCP server hands AI a set of tools it can call. Bridge is an MCP server whose tools are your mainframe - datasets, members, z/OS UNIX files, jobs, spool, TSO and the operator console, with an approval gate in front of anything that changes the system.
 
 Install it once, point Claude Code/Codex at it, then just talk to Claude.
 
@@ -73,26 +73,50 @@ cp -r .claude/skills/mainframe-workflow ~/.claude/skills/
 
 **Reading is free.** Listing datasets, reading members, checking jobs, searching spool — no approval needed.
 
-**Changing anything is gated.** Before Claude can write a member, submit a job, or delete a dataset, it must:
+**Changing anything is gated.** Before an agent can write a member, submit a job, run a command or delete a dataset, it must:
 
 1. Open a request
-2. Write a **spec** — what changes and why — and get your explicit yes
-3. Write a **plan** — the exact steps — and get your explicit yes
+2. Write a **spec** (what changes and why) and get your yes
+3. Write a **plan** that lists every change as a step, and get your yes
 
-Editing the spec after approval un-approves the plan too. Every mutation is logged with its inputs; passwords are redacted, diffs are hashed.
+**Only you can say yes.** The agent can ask for an approval. It cannot give one. Bridge asks you directly, outside the agent's reach:
 
-An agent that skips a step gets `PLAN_NOT_APPROVED` instead of access to your system.
+- in your AI client's own prompt, when the client has one, or
+- on a page Bridge opens in your browser, on your machine only, or
+- in a terminal, with `python -m mainframe_workflow_mcp.approve`, on a machine with no browser.
+
+The page's address carries a one-time token the agent never sees, so an agent that can browse still cannot press Approve.
+
+<img width="650" alt="The approval page: what was asked, the plan, and each change it allows" src="docs/approval-page.png" />
+
+**Your yes covers the listed steps and nothing else.** Each step names one tool and its target, for example `member.write` on `PAY.TEST.COBOL(PAYCALC)`. After approval a change runs only if it matches a step, and each step runs once unless the plan says more. A command step fixes the exact command. A step can also fix the exact content, diff or JCL, and then that is what must be sent.
+
+| The agent tries | It gets |
+|---|---|
+| A change before you approved | `PLAN_NOT_APPROVED` |
+| To approve its own plan | `WAITING_FOR_PERSON`, and you get asked |
+| A change the plan did not list | `STEP_NOT_IN_PLAN` |
+| A change to a protected dataset | `PROTECTED_DATASET` |
+
+Editing the spec after approval un-approves the plan too. Every change is logged with its inputs; passwords are redacted, diffs are hashed.
 
 ---
 
 ## Tools
 
+48 tools. The ones in *italics* change the system, so they need an approved plan step.
+
 | | |
 |---|---|
-| **Datasets** | list, info, read, write, create, delete, rename, copy |
-| **Members** | list, read, search, write, patch, delete, rename |
-| **Jobs** | list, status, submit, cancel, purge, wait, JCL, spool |
-| **Other** | verify connection, list profiles, search the tool catalog |
+| **Datasets** | list, info, read, *write, create, create like, delete, rename, copy, recall, migrate* |
+| **Members** | list, read, search, *write, patch, delete, rename* |
+| **z/OS UNIX files** | list, read, *write, create, delete, rename, chmod* |
+| **Jobs** | list, status, steps, failed jobs, wait, JCL, spool, output, *submit, cancel, purge, hold, release, change class* |
+| **TSO** | `tso.query` for read-only commands (LISTCAT, LISTDS, LISTUSER...), *`tso.command` for anything else* |
+| **Operator console** | *`console.command`* |
+| **System** | list systems, verify connection, list profiles, search the tool catalog |
+
+`job.steps` shows which step of a job failed, and `job.failed` lists the jobs that ended badly, so an agent can start from the failure instead of reading every log.
 
 Large reads (`member.read`, `dataset.read`, `job.output`, `job.spool.read`) accept `searchText`, `maxLines` and `regex` — so Claude finds one line in a 40,000-line job log instead of pulling the whole thing into context.
 
@@ -109,6 +133,13 @@ Copy `.env.example` to `.env` to change defaults.
 | `MAINFRAME_WORKFLOW_IDLE_DAYS` | `14` | Abandon untouched requests after |
 | `MAINFRAME_WORKFLOW_RETENTION_DAYS` | `90` | Archive finished requests after |
 | `MAINFRAME_WORKFLOW_APIML_BASE_PATH` | — | Set if z/OSMF is behind API ML |
+| `MAINFRAME_WORKFLOW_APPROVAL` | `auto` | How you approve: `auto` (your AI client's prompt, else a browser page), `prompt`, `browser`, `terminal` |
+| `MAINFRAME_WORKFLOW_APPROVAL_WAIT_SECONDS` | `60` | How long one approval call waits for you before telling the agent to ask again |
+| `MAINFRAME_WORKFLOW_READ_ONLY` | `false` | `true` offers no tool that changes anything |
+| `MAINFRAME_WORKFLOW_PROTECTED_DATASETS` | — | Patterns the dataset and member tools may never write to, e.g. `SYS1.**,*.PROD.**` |
+| `MAINFRAME_WORKFLOW_TSO_ACCOUNT` | `ACCT` | TSO account number, used on z/OSMF without the one-request TSO interface |
+
+`MAINFRAME_WORKFLOW_APPROVAL=unsafe-agent` turns the person off: the agent's own call counts as approval. It exists for automated runs against throwaway systems. Do not use it on a mainframe you care about.
 
 ---
 
@@ -122,17 +153,23 @@ Copy `.env.example` to `.env` to change defaults.
 
 **Claude says a tool isn't allowed** — approve it when prompted, or check `claude mcp list`.
 
+**The agent says an approval is waiting but nothing opened** — the address is printed in the server's log (stderr), or run `python -m mainframe_workflow_mcp.approve` in a terminal.
+
+**`STEP_NOT_IN_PLAN`** — the agent tried a change you did not approve. It has to write a new plan revision that lists it and ask you again.
+
+**`tso.command` or `console.command` answers 401 or 403** — your user ID needs TSO or EMCS console authority on the mainframe. Bridge cannot grant it.
+
 ---
 
 ## Development
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                                    # 87 tests
+pytest                                    # 167 tests
 cd credential-resolver && npm test        # 8 tests
 ```
 
-Architecture notes: [docs/architecture.md](docs/architecture.md). The z/OSMF calls live in `mainframe_workflow_mcp/toolbox/`; if the private `zcrafter-mainframe-mcp` package is installed, it's preferred automatically.
+Architecture notes: [docs/architecture.md](docs/architecture.md). The tool catalog lives in `mainframe_workflow_mcp/toolbox/` and the z/OSMF calls in `mainframe_workflow_mcp/clients/`.
 
 ---
 

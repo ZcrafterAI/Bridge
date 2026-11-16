@@ -1,5 +1,7 @@
 import pytest
 from fastmcp import Client
+from fastmcp.client.elicitation import ElicitResult
+from mainframe_workflow_mcp.approval import ApprovalBroker
 from types import SimpleNamespace
 import mainframe_workflow_mcp.server as server
 from mainframe_workflow_mcp.clients.zowe_sdk import ZoweSdkMainframeClient
@@ -14,13 +16,18 @@ class RecordingExecutor:
         self.calls.append(call)
         return {"status": "ok", "data": {"echo": call["input"]}}
 
+async def _person_approves(message, response_type, params, context):
+    return ElicitResult(action="accept", content={"value": "Approve"})
+
+
 @pytest.mark.anyio
 async def test_state_tools_are_registered_and_reachable_through_real_client(tmp_path, monkeypatch):
     store = RequestStore(tmp_path / "state.db")
     monkeypatch.setattr(server, "_store", store)
     monkeypatch.setattr(server, "_request_manager", RequestManager(store))
+    monkeypatch.setattr(server, "_broker", ApprovalBroker(store, mode="prompt"))
 
-    async with Client(server.mcp) as client:
+    async with Client(server.mcp, elicitation_handler=_person_approves) as client:
         started = await client.call_tool("start_request", {"raw_request": "add a field to CUSTREC"})
         request_id = started.data["request_id"]
 
@@ -68,5 +75,7 @@ def test_build_executor_uses_configured_zowe_profile(monkeypatch):
         ),
     )
     executor = server.build_executor()
-    assert isinstance(executor.client, ZoweSdkMainframeClient)
+    # The client is built on first use, so the server starts without a profile.
     assert executor.client.profile_name == "myprofile"
+    assert isinstance(executor.client._get(), ZoweSdkMainframeClient)
+    assert executor.client._get().profile_name == "myprofile"

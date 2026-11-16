@@ -65,6 +65,8 @@ def _write_archive_file(store: RequestStore, archive_dir: Path, request: dict) -
 
     lines += ["## Final spec", "", spec["content"] if spec else "_none_", ""]
     lines += ["## Final plan", "", plan["content"] if plan else "_none_", ""]
+    if plan and plan.get("steps_json"):
+        lines += ["### Steps", "", "```json", plan["steps_json"], "```", ""]
     lines += ["## Action log", ""]
     for a in actions:
         lines.append(f"- `{a['created_at']}` **{a['tool']}** -> {a['status']}: {a['summary']}")

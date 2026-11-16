@@ -19,3 +19,27 @@ CREDENTIAL_RESOLVER_PATH = Path(
         PROJECT_ROOT / "credential-resolver" / "dist" / "resolver.js",
     )
 )
+
+
+def _flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _list(name: str) -> list[str]:
+    return [item.strip() for item in os.environ.get(name, "").split(",") if item.strip()]
+
+
+# How a person approves a spec or a plan:
+#   auto      the AI client's own prompt when it has one, else a page in the browser
+#   prompt    the AI client's prompt only
+#   browser   a page on this machine only
+#   terminal  `python -m mainframe_workflow_mcp.approve`, for machines with no browser
+#   unsafe-agent  the agent's own call counts as approval. Nobody is asked. Test systems only.
+APPROVAL_MODE = os.environ.get("MAINFRAME_WORKFLOW_APPROVAL", "auto").strip().lower() or "auto"
+APPROVAL_WAIT_SECONDS = float(os.environ.get("MAINFRAME_WORKFLOW_APPROVAL_WAIT_SECONDS", "60"))
+# No mutating tool is offered at all.
+READ_ONLY = _flag("MAINFRAME_WORKFLOW_READ_ONLY")
+# Dataset patterns nothing may write to, e.g. "SYS1.**,*.PROD.**".
+PROTECTED_DATASETS = _list("MAINFRAME_WORKFLOW_PROTECTED_DATASETS")
+# Account number for the TSO address space on z/OSMF without the one-request TSO interface.
+TSO_ACCOUNT = os.environ.get("MAINFRAME_WORKFLOW_TSO_ACCOUNT", "").strip()

@@ -53,7 +53,10 @@ async def test_full_lifecycle_is_actually_persisted_to_the_real_sqlite_file(tmp_
     manager.record_clarification(request_id, "Which dataset holds CUSTREC?", "IBMUSER.COBOL.COPY")
     manager.draft_spec(request_id, "# Spec\nAdd MIDDLE-NAME PIC X(20) to CUSTREC.")
     manager.approve_spec(request_id)
-    manager.draft_plan(request_id, "# Plan\n1. Patch CUSTREC via member.patch.")
+    manager.draft_plan(
+        request_id, "# Plan\n1. Patch CUSTREC via member.patch.",
+        [{"tool": "member.patch", "args": {"dataset": "IBMUSER.COBOL.COPY", "member": "CUSTREC"}}],
+    )
     manager.approve_plan(request_id)
 
     async with Client(mcp) as client:

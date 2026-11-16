@@ -19,11 +19,16 @@ def manager(tmp_path):
     yield RequestManager(store)
     store.close()
 
-def _to_plan_approved(manager, raw="a"):
+STEPS = [
+    {"tool": "member.patch", "args": {"dataset": "HLQ.SRC", "member": "PROG1"}},
+    {"tool": "dataset.delete", "args": {"dataset": "HLQ.OLD"}},
+]
+
+def _to_plan_approved(manager, raw="a", steps=STEPS):
     request_id = manager.start_request(raw)["request_id"]
     manager.draft_spec(request_id, "spec")
     manager.approve_spec(request_id)
-    manager.draft_plan(request_id, "plan")
+    manager.draft_plan(request_id, "plan", steps)
     manager.approve_plan(request_id)
     return request_id
 
@@ -35,8 +40,8 @@ async def test_mutating_tool_requires_request_id_in_schema(manager):
     async with Client(mcp) as client:
         tools = {t.name: t for t in await client.list_tools()}
 
-    assert "request_id" in tools["member.patch"].inputSchema["properties"]
-    assert "request_id" in tools["member.patch"].inputSchema["required"]
+    assert "request_id" in tools["member.patch"].input_schema["properties"]
+    assert "request_id" in tools["member.patch"].input_schema["required"]
 
 @pytest.mark.anyio
 async def test_mutating_tool_blocked_before_plan_approved(manager):
@@ -164,7 +169,7 @@ async def test_every_mutating_zcrafter_tool_is_registered_and_gated_with_request
         if definition["approval"] != "required":
             continue
         assert definition["name"] in tools, f"{definition['name']} was not registered"
-        schema = tools[definition["name"]].inputSchema
+        schema = tools[definition["name"]].input_schema
         assert "request_id" in schema.get("properties", {}), (
             f"{definition['name']} is missing request_id in its exposed schema properties"
         )

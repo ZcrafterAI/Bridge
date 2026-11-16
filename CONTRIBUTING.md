@@ -8,7 +8,7 @@
 
 ## Dev setup
 
-Same as the README install: Python 3.11+, Node.js, a Zowe profile, and GitHub access to the private Zcrafter dependency.
+Same as the README install: Python 3.11+ and Node.js. The tests need no Zowe profile and no mainframe.
 
 ```bash
 python -m venv .venv
