@@ -1,7 +1,23 @@
 import importlib
 from pathlib import Path
 
-def test_defaults_resolve_under_project_root(monkeypatch):
+def test_the_store_lives_in_the_home_folder_unless_a_checkout_already_has_one(monkeypatch, tmp_path):
+    import mainframe_workflow_mcp.config as config
+
+    monkeypatch.delenv("MAINFRAME_WORKFLOW_HOME", raising=False)
+    fresh = tmp_path / "fresh-install"
+    fresh.mkdir()
+    assert config._data_dir(fresh) == Path.home() / ".zcrafter-bridge"
+    monkeypatch.setenv("MAINFRAME_WORKFLOW_HOME", str(tmp_path / "elsewhere"))
+    assert config._data_dir(fresh) == tmp_path / "elsewhere"
+
+    existing = tmp_path / "old-checkout"
+    existing.mkdir()
+    (existing / "state.db").write_bytes(b"")
+    assert config._data_dir(existing) == existing  # its requests and audit log are not left behind
+
+
+def test_defaults(monkeypatch):
     for var in (
         "MAINFRAME_WORKFLOW_DB_PATH",
         "MAINFRAME_WORKFLOW_ARCHIVE_DIR",
@@ -17,8 +33,8 @@ def test_defaults_resolve_under_project_root(monkeypatch):
     import mainframe_workflow_mcp.config as config
     importlib.reload(config)
 
-    assert config.DB_PATH == config.PROJECT_ROOT / "mainframe_workflow_mcp" / "state.db"
-    assert config.ARCHIVE_DIR == config.PROJECT_ROOT / "mainframe_workflow_mcp" / "archive"
+    assert config.DB_PATH == config._data_dir() / "state.db"
+    assert config.ARCHIVE_DIR == config._data_dir() / "archive"
     assert config.IDLE_DAYS == 14
     assert config.RETENTION_DAYS == 90
     assert config.ZOWE_PROFILE == "default"

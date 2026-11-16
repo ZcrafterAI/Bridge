@@ -182,7 +182,7 @@ Copy `.env.example` to `.env` to change defaults.
 git clone https://github.com/ZcrafterAI/Bridge.git && cd Bridge
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-pytest                                               # 184 tests, no mainframe needed
+pytest                                               # 185 tests, no mainframe needed
 python -m mainframe_workflow_mcp.cli --demo          # run from source
 ```
 

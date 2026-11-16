@@ -8,11 +8,11 @@ load_dotenv()
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _data_dir() -> Path:
+def _data_dir(beside_code: Path | None = None) -> Path:
     """Where requests and the audit log are kept. A checkout that already has its store
     beside the code keeps using it; an installed package uses a folder in the home directory,
     never its own install location."""
-    beside_code = PROJECT_ROOT / "mainframe_workflow_mcp"
+    beside_code = beside_code or PROJECT_ROOT / "mainframe_workflow_mcp"
     if (beside_code / "state.db").is_file():
         return beside_code
     return Path(os.environ.get("MAINFRAME_WORKFLOW_HOME") or Path.home() / ".zcrafter-bridge")
