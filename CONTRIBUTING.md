@@ -15,17 +15,22 @@ python -m venv .venv
 # Windows: .venv\Scripts\pip install -r requirements-dev.txt
 # macOS/Linux:
 source .venv/bin/activate
-pip install -r requirements-dev.txt
-
-cd credential-resolver && npm install && npm run build && cd ..
+pip install -e ".[dev]"
 cp .env.example .env
 ```
+
+## Releasing
+
+1. Set the same version in `pyproject.toml` and in both places in `server.json`.
+2. Commit, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`.
+3. `.github/workflows/release.yml` runs the tests, publishes to PyPI and publishes `server.json` to the official MCP Registry.
+
+One-time setup: on pypi.org add a trusted publisher for the project `zcrafter-bridge` (owner `ZcrafterAI`, repository `Bridge`, workflow `release.yml`, environment `pypi`). No token is stored. After the first PyPI release, the README's install commands can drop `--from git+https://github.com/ZcrafterAI/Bridge` and become `uvx zcrafter-bridge` and `uv tool install zcrafter-bridge`.
 
 ## Tests
 
 ```bash
 pytest -v
-cd credential-resolver && npm test && cd ..
 ```
 
 Unit tests do not need a live mainframe. The optional live smoke script is `scripts/live_zowe_sdk_tools.py` (needs real z/OSMF credentials).

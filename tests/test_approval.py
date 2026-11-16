@@ -152,7 +152,7 @@ async def test_terminal_mode_opens_nothing_and_takes_the_answer_from_the_store(s
 
     pending = store.list_pending_approvals()
     assert [(row["request_id"], row["kind"], row["version"]) for row in pending] == [(request_id, "plan", version)]
-    # What `python -m mainframe_workflow_mcp.approve` does once the person types y.
+    # What `zcrafter-bridge approve` does once the person types y.
     assert store.decide_approval(pending[0]["id"], "APPROVED", "the terminal", now="2026-01-01T00:00:00+00:00")
 
     decision = await broker.ask(None, request_id, "plan", version)

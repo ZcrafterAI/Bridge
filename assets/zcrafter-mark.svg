@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The Zcrafter Z, light on a dark tile, the same in a light and a dark browser. -->
+  <rect fill="#0f0e0d" width="512" height="512" rx="112"/>
+  <path fill="#fafaf9" d="M92.8 92.2L306.2 92.2L306.2 174.7L419.2 174.7L205.8 338.6L419.2 338.6L419.2 419.8L92.8 419.8L92.8 338.6L306.2 174.7L92.8 174.7Z"/>
+</svg>

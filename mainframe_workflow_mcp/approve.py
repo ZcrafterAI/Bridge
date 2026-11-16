@@ -1,6 +1,6 @@
 """Approve or reject waiting requests from a terminal.
 
-    python -m mainframe_workflow_mcp.approve
+    zcrafter-bridge approve          (from a checkout: python -m mainframe_workflow_mcp.approve)
 
 For machines with no browser (a server reached over SSH). It asks a person at a keyboard, so
 it refuses to run when its input is not a terminal: an agent's shell cannot answer for you.

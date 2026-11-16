@@ -1,10 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "mainframe-mcp"
-version = "0.2.0"
-description = "MCP server that gates mainframe/z/OS changes behind spec and plan approval"
+name = "zcrafter-bridge"
+version = "0.3.0"
+description = "MCP server that gives AI agents an IBM z/OS mainframe, with every change approved by a person"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
+authors = [{ name = "Zcrafter" }]
+keywords = ["mcp", "mainframe", "zos", "zowe", "zosmf", "cobol", "jcl", "ai-agents"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "fastmcp>=4.2",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "keyring>=24",
+    "zowe-zos-files-for-zowe-sdk==0.5.0",
+    "zowe-zos-jobs-for-zowe-sdk==0.5.0",
+    "zowe-zosmf-for-zowe-sdk==0.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "responses>=0.24"]
+
+[project.urls]
+Homepage = "https://zcrafter.com"
+Repository = "https://github.com/ZcrafterAI/Bridge"
+Issues = "https://github.com/ZcrafterAI/Bridge/issues"
+
+[project.scripts]
+zcrafter-bridge = "mainframe_workflow_mcp.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mainframe_workflow_mcp"]
+
+[tool.hatch.build.targets.wheel.force-include]
+".claude/skills/mainframe-workflow/SKILL.md" = "mainframe_workflow_mcp/skill/SKILL.md"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "mainframe_workflow_mcp",
+    "tests",
+    "docs",
+    "assets",
+    ".claude/skills",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "server.json",
+    ".env.example",
+]
+exclude = ["mainframe_workflow_mcp/state.db", "mainframe_workflow_mcp/archive"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

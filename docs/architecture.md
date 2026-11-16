@@ -14,14 +14,18 @@ This is the developer map for **Mainframe Workflow MCP**. Users should start at 
 | z/OSMF HTTP via the Zowe Python SDK | [`mainframe_workflow_mcp/clients/zowe_sdk.py`](../mainframe_workflow_mcp/clients/zowe_sdk.py) |
 | SQLite request store + audit log | [`mainframe_workflow_mcp/db.py`](../mainframe_workflow_mcp/db.py) |
 | Idle abandon / archive | [`mainframe_workflow_mcp/lifecycle.py`](../mainframe_workflow_mcp/lifecycle.py) |
-| Zowe vault → host/user/password | [`mainframe_workflow_mcp/credentials.py`](../mainframe_workflow_mcp/credentials.py) and [`credential-resolver/`](../credential-resolver/) |
+| Where the sign-in comes from (environment, Zowe config and keychain) | [`mainframe_workflow_mcp/credentials.py`](../mainframe_workflow_mcp/credentials.py) |
+| The `zcrafter-bridge` command and demo mode | [`mainframe_workflow_mcp/cli.py`](../mainframe_workflow_mcp/cli.py), [`demo.py`](../mainframe_workflow_mcp/demo.py) |
 | Agent instructions for the gate | [`.claude/skills/mainframe-workflow/SKILL.md`](../.claude/skills/mainframe-workflow/SKILL.md) |
 
 ## Folder map
 
 ```
 mainframe_workflow_mcp/   Python MCP server (this product)
-credential-resolver/      Node helper: reads the OS vault Zowe already uses
+credential-resolver/      older Node helper for the Zowe keychain; a fallback only
+assets/                   logo files used by the README and the registry listing
+server.json               the listing published to the official MCP Registry
+install.sh                the one-line installer
 tests/                    pytest suite for the workflow server
 scripts/                  optional live z/OSMF smoke script
 .claude/skills/           companion skill that teaches the agent the gate
@@ -50,7 +54,9 @@ mainframe_workflow_mcp
    Zowe Python SDK → z/OSMF → your z/OS system
 ```
 
-Credentials are resolved once at startup: Python runs `credential-resolver/dist/resolver.js`, which prints a JSON profile to stdout. Nothing from the vault is written to disk.
+Credentials are resolved the first time a tool needs the mainframe (`credentials.py`): `ZOWE_OPT_*` environment variables first, then the Zowe team config with secure properties read from the OS keychain (the single `Zowe` / `secure_config_props` entry, or the older one entry per property), then the Node helper if it has been built. Nothing read is written to disk. Requests and the audit log live in `~/.zcrafter-bridge/` unless `MAINFRAME_WORKFLOW_DB_PATH` says otherwise; a checkout that already has `state.db` beside the code keeps using it.
+
+`zcrafter-bridge --demo` starts `demo.py`, a small in-memory stand-in for z/OSMF on a local port, and points the server at it with a throwaway store. The demo tests drive the real z/OSMF client against it over HTTP.
 
 ## Request lifecycle (internal names)
 
@@ -75,7 +81,7 @@ The broker asks in this order (`MAINFRAME_WORKFLOW_APPROVAL=auto`):
 
 1. **The AI client's own prompt** (MCP elicitation), when the client declares it. On protocol versions before 2026-07-28 the server asks during the call (`ctx.elicit`). From 2026-07-28 a server can no longer ask mid-call, so the tool returns `InputRequiredResult` and the client calls it again with the person's answer; the answer counts only for the request, kind and version it was asked about (`request_state`).
 2. **A page on this machine.** The broker starts an HTTP server on `127.0.0.1` on a free port and opens `/approval/<id>?t=<token>` in the person's browser. The token is random, stored only as a hash, and is never part of any tool result, so the agent cannot build the address. The page answers only to a local `Host`, refuses a POST from another origin, and takes one answer.
-3. **A terminal.** `python -m mainframe_workflow_mcp.approve` reads the pending approvals from the store and asks at a TTY. It refuses to run with piped input.
+3. **A terminal.** `zcrafter-bridge approve` reads the pending approvals from the store and asks at a TTY. It refuses to run with piped input.
 
 A tool call waits `MAINFRAME_WORKFLOW_APPROVAL_WAIT_SECONDS` for the page or the terminal, then returns `WAITING_FOR_PERSON`; the approval stays open and the next call picks up the answer. An answer belongs to one revision: a rejected revision stays rejected, and an edit makes a new revision that must be asked about again.
 

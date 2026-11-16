@@ -4,6 +4,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 
+# Build output
+/dist/
+*.egg-info/
+
 # Node
 node_modules/
 credential-resolver/dist/

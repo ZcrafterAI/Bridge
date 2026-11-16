@@ -1,0 +1,68 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ZcrafterAI/bridge",
+  "title": "Zcrafter Bridge",
+  "description": "IBM z/OS mainframe tools for AI agents. Every change needs a person's approval.",
+  "version": "0.3.0",
+  "websiteUrl": "https://zcrafter.com",
+  "repository": {
+    "url": "https://github.com/ZcrafterAI/Bridge",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/ZcrafterAI/Bridge/main/assets/zcrafter-mark-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/ZcrafterAI/Bridge/main/assets/zcrafter-mark.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "zcrafter-bridge",
+      "version": "0.3.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MAINFRAME_WORKFLOW_ZOWE_PROFILE",
+          "description": "Zowe z/OSMF profile to use. Defaults to the profile named default.",
+          "isRequired": false
+        },
+        {
+          "name": "ZOWE_OPT_HOST",
+          "description": "z/OSMF host, when not using a Zowe profile.",
+          "isRequired": false
+        },
+        {
+          "name": "ZOWE_OPT_USER",
+          "description": "Mainframe user ID, when not using a Zowe profile.",
+          "isRequired": false
+        },
+        {
+          "name": "ZOWE_OPT_PASSWORD",
+          "description": "Mainframe password, when not using a Zowe profile.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "MAINFRAME_WORKFLOW_READ_ONLY",
+          "description": "Set to true to offer no tool that changes anything.",
+          "isRequired": false
+        },
+        {
+          "name": "MAINFRAME_WORKFLOW_PROTECTED_DATASETS",
+          "description": "Comma-separated dataset patterns nothing may write to, e.g. SYS1.**,*.PROD.**",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

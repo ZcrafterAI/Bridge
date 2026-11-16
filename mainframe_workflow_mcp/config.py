@@ -6,8 +6,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = Path(os.environ.get("MAINFRAME_WORKFLOW_DB_PATH", PROJECT_ROOT / "mainframe_workflow_mcp" / "state.db"))
-ARCHIVE_DIR = Path(os.environ.get("MAINFRAME_WORKFLOW_ARCHIVE_DIR", PROJECT_ROOT / "mainframe_workflow_mcp" / "archive"))
+
+
+def _data_dir() -> Path:
+    """Where requests and the audit log are kept. A checkout that already has its store
+    beside the code keeps using it; an installed package uses a folder in the home directory,
+    never its own install location."""
+    beside_code = PROJECT_ROOT / "mainframe_workflow_mcp"
+    if (beside_code / "state.db").is_file():
+        return beside_code
+    return Path(os.environ.get("MAINFRAME_WORKFLOW_HOME") or Path.home() / ".zcrafter-bridge")
+
+
+DB_PATH = Path(os.environ.get("MAINFRAME_WORKFLOW_DB_PATH") or _data_dir() / "state.db")
+ARCHIVE_DIR = Path(os.environ.get("MAINFRAME_WORKFLOW_ARCHIVE_DIR") or _data_dir() / "archive")
 IDLE_DAYS = int(os.environ.get("MAINFRAME_WORKFLOW_IDLE_DAYS", "14"))
 RETENTION_DAYS = int(os.environ.get("MAINFRAME_WORKFLOW_RETENTION_DAYS", "90"))
 ZOWE_PROFILE = os.environ.get("MAINFRAME_WORKFLOW_ZOWE_PROFILE", "default")
@@ -33,7 +45,7 @@ def _list(name: str) -> list[str]:
 #   auto      the AI client's own prompt when it has one, else a page in the browser
 #   prompt    the AI client's prompt only
 #   browser   a page on this machine only
-#   terminal  `python -m mainframe_workflow_mcp.approve`, for machines with no browser
+#   terminal  `zcrafter-bridge approve`, for machines with no browser
 #   unsafe-agent  the agent's own call counts as approval. Nobody is asked. Test systems only.
 APPROVAL_MODE = os.environ.get("MAINFRAME_WORKFLOW_APPROVAL", "auto").strip().lower() or "auto"
 APPROVAL_WAIT_SECONDS = float(os.environ.get("MAINFRAME_WORKFLOW_APPROVAL_WAIT_SECONDS", "60"))

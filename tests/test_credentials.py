@@ -1,7 +1,11 @@
 import json
 import subprocess
 import pytest
-from mainframe_workflow_mcp.credentials import resolve_credentials, CredentialResolutionError
+from mainframe_workflow_mcp.credentials import CredentialResolutionError
+from mainframe_workflow_mcp.credentials import from_node_resolver as resolve_credentials
+
+# These cover the Node helper, which is still used when it has been built and the Python
+# lookup finds nothing. The Python lookup has its own tests in test_credentials_python.py.
 
 def test_resolve_credentials_parses_resolver_output(monkeypatch):
     def fake_run(args, capture_output, text, timeout):

@@ -7,7 +7,7 @@ the agent does not control:
     versions before 2026-07-28 the server asks during the call; from 2026-07-28 the call
     returns "input required" and the client retries it with the person's answer. Or
   * a page this server opens in the person's browser, on this machine only, or
-  * `python -m mainframe_workflow_mcp.approve` in a terminal, for machines with no browser.
+  * `zcrafter-bridge approve` in a terminal, for machines with no browser.
 
 The page's address carries a one-time token that is never sent to the agent, so an agent that
 can fetch web pages still cannot press Approve.
@@ -254,12 +254,12 @@ class ApprovalBroker:
                 if shown is False:
                     self._log(
                         "[bridge] No browser opened. Open the address above, or run "
-                        "`python -m mainframe_workflow_mcp.approve` in a terminal."
+                        "`zcrafter-bridge approve` in a terminal."
                     )
         else:
             self._log(
                 f"[bridge] Approval needed for the {subject['kind']}: run "
-                "`python -m mainframe_workflow_mcp.approve` in a terminal."
+                "`zcrafter-bridge approve` in a terminal."
             )
 
         deadline = asyncio.get_running_loop().time() + self.wait_seconds
@@ -270,7 +270,7 @@ class ApprovalBroker:
             if row and row["status"] == "REJECTED":
                 return Decision("rejected", row.get("via") or "")
             if asyncio.get_running_loop().time() >= deadline:
-                terminal = "by running `python -m mainframe_workflow_mcp.approve` in a terminal"
+                terminal = "by running `zcrafter-bridge approve` in a terminal"
                 where = f"on the page Bridge opened in their browser, or {terminal}" if open_page else terminal
                 return Decision("waiting", detail=f"The person has not answered yet. They approve {where}.")
             await asyncio.sleep(self._poll_seconds)
