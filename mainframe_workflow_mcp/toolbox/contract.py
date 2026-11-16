@@ -18,7 +18,9 @@ _O = {"type": "object"}
 
 def _t(name: str, approval: str, description: str,
        required: dict[str, dict], optional: dict[str, dict] | None = None) -> dict[str, Any]:
-    props = {"profileName": {**_S, "description": "Zowe profile to run against."}}
+    props = {"profileName": {
+        **_S, "description": "Optional. The Zowe profile to run against; leave it out to use this server's own.",
+    }}
     props.update(required)
     props.update(optional or {})
     return {
@@ -28,7 +30,7 @@ def _t(name: str, approval: str, description: str,
         "inputSchema": {
             "type": "object",
             "properties": props,
-            "required": ["profileName", *required.keys()],
+            "required": [*required.keys()],
         },
     }
 
@@ -37,6 +39,8 @@ _DS = {"dataset": {**_S, "description": "Fully-qualified dataset name."}}
 _DSM = {**_DS, "member": {**_S, "description": "PDS member name."}}
 _JOB = {"jobId": {**_S, "description": "JES job id, e.g. JOB00042."}}
 _JOBNAME = {"jobName": {**_S, "description": "Job name; looked up when omitted."}}
+_PATH = {"path": {**_S, "description": "Absolute z/OS UNIX path, e.g. /u/ibmuser/app.log"}}
+_COMMAND = {"command": {**_S, "description": "The command, on one line."}}
 
 # Params every content-returning read accepts. Pulling a whole member or spool
 # file into a model's context is the most expensive thing this server can do,
@@ -51,8 +55,7 @@ _EXCERPT = {
 _DEFINITIONS: list[dict[str, Any]] = [
     # ---------------- read-only ----------------
     _t("profile.list", "never",
-       "List the z/OSMF profiles this server can use. Call this first if you "
-       "do not know which profileName to pass.", {}),
+       "List the z/OSMF profile this server uses. You do not need to pass profileName.", {}),
     _t("connection.verify", "never", "Check z/OSMF reachability and authentication.", {}),
     _t("dataset.list", "never", "List datasets matching a pattern.",
        {"pattern": {**_S, "description": "Dataset pattern, e.g. HLQ.**"}},
@@ -77,6 +80,25 @@ _DEFINITIONS: list[dict[str, Any]] = [
     _t("job.output", "never",
        "Read a job's spool output. Pass searchText to find lines in a large log "
        "instead of returning all of it.", _JOB, {**_JOBNAME, **_EXCERPT}),
+    _t("job.steps", "never",
+       "Each step of a job with its program and completion code. Use it to find the step "
+       "that failed before reading the spool.", _JOB, _JOBNAME),
+    _t("job.failed", "never",
+       "List finished jobs that ended badly: an abend, a JCL error, or a return code above "
+       "maxRc (default 4).", {},
+       {"owner": {**_S, "description": "Job owner; * for everyone (default)."},
+        "prefix": {**_S, "description": "Job name prefix, e.g. PAY*."},
+        "maxRc": {**_I, "description": "Highest return code that still counts as fine."},
+        "limit": _I}),
+    _t("uss.list", "never", "List a z/OS UNIX directory: names, permissions, sizes.", _PATH,
+       {"limit": _I}),
+    _t("uss.read", "never", "Read a z/OS UNIX text file.", _PATH, _EXCERPT),
+    _t("system.list", "never",
+       "List the z/OS systems defined to z/OSMF, with sysplex and z/OS version.", {}),
+    _t("tso.query", "never",
+       "Run one read-only TSO command and return its output: LISTCAT, LISTDS, LISTALC, "
+       "LISTUSER, LISTGRP, RLIST, SEARCH, STATUS, TIME. Anything else needs tso.command.",
+       _COMMAND, _EXCERPT),
     _t("zowe.tools.search", "never",
        "Search this server's own tool catalog by keyword.",
        {"query": {**_S, "description": "Keyword to match against tool names and descriptions."}}),
@@ -105,6 +127,34 @@ _DEFINITIONS: list[dict[str, Any]] = [
        {"jcl": _S, "dataset": _S}),
     _t("job.cancel", "required", "Cancel a running job.", _JOB, _JOBNAME),
     _t("job.purge", "required", "Purge a job from the spool.", _JOB, _JOBNAME),
+    _t("job.hold", "required", "Hold a job so it does not run or print.", _JOB, _JOBNAME),
+    _t("job.release", "required", "Release a held job.", _JOB, _JOBNAME),
+    _t("job.changeClass", "required", "Move a job to another job class.",
+       {**_JOB, "jobClass": {**_S, "description": "The new class, one character, e.g. A."}}, _JOBNAME),
+    _t("dataset.recall", "required", "Recall a migrated dataset from archive storage (HRECALL).", _DS),
+    _t("dataset.migrate", "required", "Migrate a dataset to archive storage (HMIGRATE).", _DS),
+    _t("uss.write", "required", "Create or overwrite a z/OS UNIX text file.",
+       {**_PATH, "content": _S}),
+    _t("uss.create", "required", "Create an empty z/OS UNIX file or a directory.", _PATH,
+       {"type": {**_S, "description": "file (default) or directory."},
+        "mode": {**_S, "description": "Permissions as rwxr-xr-x (the default)."}}),
+    _t("uss.delete", "required", "Delete a z/OS UNIX file or directory.", _PATH,
+       {"recursive": {**_B, "description": "Also delete everything inside a directory."}}),
+    _t("uss.rename", "required", "Move or rename a z/OS UNIX file or directory.",
+       {**_PATH, "newPath": {**_S, "description": "Where it goes."}}),
+    _t("uss.chmod", "required", "Change the permissions of a z/OS UNIX file or directory.",
+       {**_PATH, "mode": {**_S, "description": "Octal permissions, e.g. 755."}},
+       {"recursive": {**_B, "description": "Apply to everything inside a directory."}}),
+    _t("tso.command", "required",
+       "Run one TSO command and return its output (ALLOCATE, DELETE, RENAME, RACF commands...). "
+       "The plan step must give the exact command. SUBMIT is refused: use job.submit.",
+       _COMMAND, _EXCERPT),
+    _t("console.command", "required",
+       "Issue one MVS operator command and return the response. The plan step must give the "
+       "exact command.",
+       _COMMAND,
+       {"consoleName": {**_S, "description": "EMCS console to use; the default console when omitted."},
+        **_EXCERPT}),
 ]
 
 # tool name -> ZoweSdkMainframeClient method
@@ -137,6 +187,24 @@ METHODS: dict[str, str] = {
     "job.submit": "submit_job",
     "job.cancel": "cancel_job",
     "job.purge": "purge_job",
+    "job.steps": "get_job_steps",
+    "job.failed": "list_failed_jobs",
+    "uss.list": "list_uss",
+    "uss.read": "read_uss",
+    "system.list": "list_systems",
+    "tso.query": "tso_query",
+    "job.hold": "hold_job",
+    "job.release": "release_job",
+    "job.changeClass": "change_job_class",
+    "dataset.recall": "recall_dataset",
+    "dataset.migrate": "migrate_dataset",
+    "uss.write": "write_uss",
+    "uss.create": "create_uss",
+    "uss.delete": "delete_uss",
+    "uss.rename": "rename_uss",
+    "uss.chmod": "chmod_uss",
+    "tso.command": "tso_command",
+    "console.command": "console_command",
 }
 
 

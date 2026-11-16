@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from typing import Any
+from urllib.parse import quote
+
+import requests as _http
 
 from .._toolbox import apply_unified_diff
+from . import tso as _tso
 from zowe.zos_files_for_zowe_sdk import Files
 from zowe.zos_jobs_for_zowe_sdk import Jobs
 from zowe.zosmf_for_zowe_sdk import Zosmf
@@ -23,12 +28,21 @@ class ZoweSdkMainframeClient:
         jobs: Any | None = None,
         zosmf: Any | None = None,
         base_path: str = "",
+        tso_account: str = "",
     ) -> None:
         if not profile_name:
             raise ValueError("Zowe CLI profile name is required.")
         self.profile_name = profile_name
         self._timeout = timeout_seconds
         self._protocol = _string(connection.get("protocol"), "https") or "https"
+        # For the z/OSMF services the Zowe SDK has no class for: TSO, consoles, topology.
+        self._root = (
+            f"{self._protocol}://{_string(connection.get('host_url'))}"
+            f"{base_path.rstrip('/') if base_path else '/zosmf'}"
+        )
+        self._auth = (_string(connection.get("user")), _string(connection.get("password")))
+        self._verify = bool(connection.get("ssl_verification", True))
+        self._tso_account = tso_account or "ACCT"
         sdk_connection = {key: value for key, value in connection.items() if key != "protocol"}
         self._files = files if files is not None else Files(sdk_connection)
         self._jobs = jobs if jobs is not None else Jobs(sdk_connection)
@@ -79,7 +93,7 @@ class ZoweSdkMainframeClient:
     def _assert_profile(self, input: dict[str, Any]) -> None:
         tool_profile = _string(input.get("profileName"))
         if not tool_profile:
-            raise ValueError("Tool profile is required.")
+            return  # this server is bound to one profile, so naming it is optional
         if tool_profile != self.profile_name:
             raise ValueError(
                 f'Tool profile "{tool_profile}" does not match resolved client profile "{self.profile_name}"'
@@ -148,6 +162,38 @@ class ZoweSdkMainframeClient:
             args.setdefault("headers", {}).update(headers)
         codes = expected_code if expected_code is not None else [200]
         return self._jobs.request_handler.perform_request(method, args, codes)
+
+    def _raw(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json_body: Any = None,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[int, Any]:
+        """One call to a z/OSMF service by path. Returns (status, JSON or text)."""
+        response = _http.request(
+            method,
+            f"{self._root}{path}",
+            auth=self._auth,
+            verify=self._verify,
+            timeout=self._timeout,
+            params=params,
+            json=json_body,
+            headers={"X-CSRF-ZOSMF-HEADER": "true", **(headers or {})},
+        )
+        try:
+            payload: Any = response.json()
+        except ValueError:
+            payload = response.text
+        return response.status_code, payload
+
+    def _raw_ok(self, method: str, path: str, ok: tuple[int, ...] = (200,), **kwargs: Any) -> Any:
+        status, payload = self._raw(method, path, **kwargs)
+        if status not in ok:
+            raise RuntimeError(f"z/OSMF answered {status} for {method} {path}: {_error_text(payload)}")
+        return payload
 
     async def list_profiles(self, input: dict[str, Any]) -> dict[str, Any]:
         """The profile this server is bound to. Every other tool requires
@@ -457,6 +503,284 @@ class ZoweSdkMainframeClient:
             contents.append(content["content"])
         return {**_excerpt("\n\n".join(contents), input), "spoolFiles": spool["spoolFiles"]}
 
+    # ---- jobs: steps, failures, hold, release, class ----
+
+    async def get_job_steps(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        job_name, job_id = await self._resolve_job(input)
+        payload = await self._run(
+            self._jobs_request, "GET", f"{job_name}/{job_id}", params={"step-data": "Y"},
+        )
+        job = payload if isinstance(payload, dict) else {}
+        steps = [
+            _compact({
+                "number": step.get("step-number"),
+                "step": step.get("step-name"),
+                "procStep": step.get("proc-step-name"),
+                "program": step.get("program-name"),
+                "completion": step.get("completion"),
+                "active": step.get("active"),
+            })
+            for step in job.get("step-data") or [] if isinstance(step, dict)
+        ]
+        return {**_normalize_job(job), "steps": steps}
+
+    async def list_failed_jobs(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        owner = _string(input.get("owner")) or "*"
+        prefix = _string(input.get("prefix")) or "*"
+        max_rc = int(input.get("maxRc") if input.get("maxRc") is not None else 4)
+        payload = await self._run(
+            self._jobs_request, "GET", "", params={"owner": owner, "prefix": prefix, "max-jobs": 200},
+        )
+        listed = [_normalize_job(item) for item in _as_list(payload)]
+        failed = [job for job in listed if _job_ended_badly(_string(job.get("returnCode")), max_rc)]
+        return {
+            "owner": owner,
+            "prefix": prefix,
+            "checked": len(listed),
+            "failed": _limit(failed, input.get("limit")),
+        }
+
+    async def _job_request(self, input: dict[str, Any], body: dict[str, Any]) -> None:
+        job_name, job_id = await self._resolve_job(input)
+        await self._run(
+            self._jobs_request, "PUT", f"{job_name}/{job_id}",
+            json_body={**body, "version": "2.0"}, expected_code=[200, 202],
+        )
+
+    async def hold_job(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        await self._job_request(input, {"request": "hold"})
+        return {"held": True}
+
+    async def release_job(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        await self._job_request(input, {"request": "release"})
+        return {"released": True}
+
+    async def change_job_class(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        job_class = _string(input["jobClass"]).upper()
+        if not re.fullmatch(r"[A-Z0-9]{1,8}", job_class):
+            raise ValueError("jobClass is one to eight letters or digits, e.g. A.")
+        await self._job_request(input, {"class": job_class})
+        return {"jobClass": job_class}
+
+    # ---- datasets: archive storage ----
+
+    async def recall_dataset(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        await self._run(
+            self._files_request, "PUT", f"ds/{_string(input['dataset'])}",
+            json_body={"request": "hrecall", "wait": True}, expected_code=[200, 204],
+        )
+        return {"recalled": True}
+
+    async def migrate_dataset(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        await self._run(
+            self._files_request, "PUT", f"ds/{_string(input['dataset'])}",
+            json_body={"request": "hmigrate", "wait": True}, expected_code=[200, 204],
+        )
+        return {"migrated": True}
+
+    # ---- z/OS UNIX files ----
+
+    async def list_uss(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        path = _uss_path(input["path"])
+        payload = await self._run(self._files_request, "GET", "fs", params={"path": path})
+        entries = [
+            _compact({
+                "name": item.get("name"),
+                "mode": item.get("mode"),
+                "size": item.get("size"),
+                "owner": item.get("user"),
+                "group": item.get("group"),
+                "modified": item.get("mtime"),
+            })
+            for item in _items(payload) if isinstance(item, dict) and item.get("name") not in (".", "..")
+        ]
+        return {"path": path, "entries": _limit(entries, input.get("limit"))}
+
+    async def read_uss(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        path = _uss_path(input["path"])
+        payload = await self._run(self._files_request, "GET", _uss_suffix(path))
+        return {"path": path, **_excerpt(_content(payload), input)}
+
+    async def write_uss(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        path = _uss_path(input["path"])
+        content = _string(input.get("content"))
+        await self._run(
+            self._files_request, "PUT", _uss_suffix(path), data=content.encode("utf-8"),
+            headers={"Content-Type": "text/plain; charset=utf-8", "X-IBM-Data-Type": "text"},
+            expected_code=[200, 201, 204],
+        )
+        return {"written": True, "path": path, "bytes": len(content.encode("utf-8"))}
+
+    async def create_uss(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        path = _uss_path(input["path"])
+        kind = _string(input.get("type"), "file").lower() or "file"
+        if kind in ("dir", "folder"):
+            kind = "directory"
+        if kind not in ("file", "directory"):
+            raise ValueError("type is file or directory.")
+        mode = _string(input.get("mode")) or "rwxr-xr-x"
+        if not re.fullmatch(r"[rwx-]{9}", mode):
+            raise ValueError("mode is nine characters of r, w, x and -, e.g. rwxr-xr-x.")
+        await self._run(
+            self._files_request, "POST", _uss_suffix(path),
+            json_body={"type": kind, "mode": mode}, expected_code=[201, 200],
+        )
+        return {"created": True, "path": path, "type": kind}
+
+    async def delete_uss(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        path = _uss_path(input["path"])
+        if path.rstrip("/") == "" or path.count("/") < 2:
+            raise ValueError("Refusing to delete a top-level directory.")
+        await self._run(
+            self._files_request, "DELETE", _uss_suffix(path),
+            headers={"X-IBM-Option": "recursive"} if input.get("recursive") else None,
+            expected_code=[200, 204],
+        )
+        return {"deleted": True, "path": path}
+
+    async def rename_uss(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        path = _uss_path(input["path"])
+        new_path = _uss_path(input["newPath"])
+        await self._run(
+            self._files_request, "PUT", _uss_suffix(new_path),
+            json_body={"request": "move", "from": path}, expected_code=[200, 204],
+        )
+        return {"renamed": True, "path": new_path}
+
+    async def chmod_uss(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        path = _uss_path(input["path"])
+        mode = _string(input["mode"])
+        if not re.fullmatch(r"[0-7]{3,4}", mode):
+            raise ValueError("mode is octal permissions, e.g. 755.")
+        body: dict[str, Any] = {"request": "chmod", "mode": mode}
+        if input.get("recursive"):
+            body["recursive"] = True
+        await self._run(
+            self._files_request, "PUT", _uss_suffix(path), json_body=body, expected_code=[200, 204],
+        )
+        return {"changed": True, "path": path, "mode": mode}
+
+    # ---- the system, TSO, the operator console ----
+
+    async def list_systems(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        payload = await self._run(self._raw_ok, "GET", "/resttopology/systems")
+        systems = [
+            _compact({
+                "name": _pick(item, "systemNickName", "systemName"),
+                "systemName": item.get("systemName"),
+                "sysplex": item.get("sysplexName"),
+                "zosVersion": item.get("zosVR"),
+                "jesMember": item.get("jesMemberName"),
+                "url": item.get("url"),
+            })
+            for item in _items(payload) if isinstance(item, dict)
+        ]
+        return {"systems": systems}
+
+    async def tso_query(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        command = _string(input.get("command")).strip()
+        if not command:
+            raise ValueError("command is required.")
+        writes = _tso.writing_operand(command)
+        if writes:
+            raise ValueError(
+                f"{writes} writes a dataset, so this is not a read-only query. Use tso.command, "
+                "which needs an approved plan step."
+            )
+        if not _tso.is_query(command):
+            raise ValueError(
+                f"{_tso.command_verb(command) or 'That'} is not a read-only query "
+                f"(allowed: {', '.join(_tso.TSO_QUERY_COMMANDS)}). Use tso.command, which needs "
+                "an approved plan step."
+            )
+        return await self._run_tso(command, input)
+
+    async def tso_command(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        command = _string(input.get("command")).strip()
+        if not command:
+            raise ValueError("command is required.")
+        if _tso.has_control_character(command):
+            raise ValueError(_tso.ONE_LINE)
+        if _tso.submits(command):
+            raise ValueError(_tso.SUBMIT_REFUSAL)
+        return await self._run_tso(command, input)
+
+    async def _run_tso(self, command: str, input: dict[str, Any]) -> dict[str, Any]:
+        lines = await self._run(self._tso_lines, command)
+        return {"command": command, **_excerpt("\n".join(lines), input)}
+
+    def _tso_lines(self, command: str) -> list[str]:
+        """One TSO command: the one-request interface where z/OSMF has it, else a short-lived
+        address space that is started, sent the command, read until its prompt and stopped."""
+        status, payload = self._raw(
+            "PUT", "/tsoApp/v1/tso", json_body={"tsoCmd": command, "cmdState": "stateless"},
+        )
+        if status == 200:
+            return _tso_response_lines(payload)[0]
+        if status != 404:
+            raise RuntimeError(f"z/OSMF answered {status} for the TSO command: {_error_text(payload)}")
+
+        started = self._raw_ok(
+            "POST", "/tsoApp/tso",
+            params={"acct": self._tso_account, "proc": "IZUFPROC", "chset": "697", "cpage": "1047",
+                    "rows": "204", "cols": "160", "rsize": "4096"},
+        )
+        key = _string(started.get("servletKey")) if isinstance(started, dict) else ""
+        if not key:
+            raise RuntimeError("z/OSMF did not start a TSO address space.")
+        session = f"/tsoApp/tso/{quote(key, safe='')}"
+        try:
+            lines, prompt = _tso_response_lines(self._raw_ok(
+                "PUT", session, json_body={"TSO RESPONSE": {"VERSION": "0100", "DATA": command}},
+            ))
+            deadline = time.monotonic() + min(self._timeout, 60.0)
+            while not prompt and time.monotonic() < deadline:
+                time.sleep(1.0)
+                more, prompt = _tso_response_lines(self._raw_ok("GET", session))
+                lines.extend(more)
+            if not prompt:
+                lines.append("... TSO did not return to its prompt in time.")
+            return lines
+        finally:
+            try:
+                self._raw("DELETE", session)
+            except Exception:
+                pass
+
+    async def console_command(self, input: dict[str, Any]) -> dict[str, Any]:
+        self._assert_profile(input)
+        command = _string(input.get("command")).strip()
+        if not command:
+            raise ValueError("command is required.")
+        if _tso.has_control_character(command):
+            raise ValueError("An operator command is one line, with no line breaks or control characters.")
+        console = _string(input.get("consoleName")) or "defcn"
+        if not re.fullmatch(r"[A-Za-z0-9#@$]{2,8}", console):
+            raise ValueError("consoleName is two to eight letters or digits.")
+        payload = await self._run(
+            self._raw_ok, "PUT", f"/restconsoles/consoles/{console}", json_body={"cmd": command},
+        )
+        response = _string(payload.get("cmd-response")) if isinstance(payload, dict) else _string(payload)
+        text = response.replace("\r\n", "\n").replace("\r", "\n")
+        return {"command": command, **_excerpt(text, input)}
+
     async def _resolve_job(self, input: dict[str, Any]) -> tuple[str, str]:
         job_id = _string(input["jobId"])
         job_name = _string(input.get("jobName"))
@@ -467,6 +791,59 @@ class ZoweSdkMainframeClient:
             if isinstance(item, dict) and _string(_pick(item, "jobid", "jobId")) == job_id:
                 return _string(_pick(item, "jobname", "jobName")), job_id
         raise LookupError(f'Job "{job_id}" was not found.')
+
+
+def _error_text(payload: Any) -> str:
+    """What z/OSMF said went wrong, kept short."""
+    if isinstance(payload, dict):
+        for key in ("message", "msgData", "details", "reason"):
+            if payload.get(key):
+                return str(payload[key])[:400]
+        return str(payload)[:400]
+    return str(payload).strip()[:400] or "no detail"
+
+
+def _uss_path(value: Any) -> str:
+    path = _string(value).strip()
+    if not path.startswith("/"):
+        raise ValueError("path must be absolute, starting with /.")
+    if "\x00" in path or any(part == ".." for part in path.split("/")):
+        raise ValueError("path must not contain .. or control characters.")
+    return path
+
+
+def _uss_suffix(path: str) -> str:
+    """A z/OS UNIX path as the restfiles service takes it: fs/u/ibmuser/file.txt"""
+    return "fs" + quote(path, safe="/")
+
+
+def _job_ended_badly(return_code: str, max_rc: int) -> bool:
+    upper = return_code.strip().upper()
+    if not upper:
+        return False
+    if re.search(r"ABEND|JCL ERROR|CANCEL|FAIL|SEC ERROR|SEC VIOL|SYS FAIL|CONV ERROR", upper):
+        return True
+    match = re.fullmatch(r"CC\s+(\d+)", upper)
+    return bool(match) and int(match.group(1)) > max_rc
+
+
+def _tso_response_lines(payload: Any) -> tuple[list[str], bool]:
+    """(output lines, whether TSO is back at its prompt) from a z/OSMF TSO response."""
+    lines: list[str] = []
+    prompt = False
+    if not isinstance(payload, dict):
+        return lines, prompt
+    for entry in [*(payload.get("cmdResponse") or []), *(payload.get("tsoData") or [])]:
+        if not isinstance(entry, dict):
+            continue
+        if isinstance(entry.get("message"), str):
+            lines.append(entry["message"])
+        message = entry.get("TSO MESSAGE")
+        if isinstance(message, dict) and isinstance(message.get("DATA"), str):
+            lines.append(message["DATA"])
+        if entry.get("TSO PROMPT"):
+            prompt = True
+    return lines, prompt
 
 
 def _create_body(attributes: Any) -> dict[str, Any]:

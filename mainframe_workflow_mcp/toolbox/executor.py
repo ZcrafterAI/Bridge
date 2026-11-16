@@ -26,6 +26,10 @@ def _target(tool: str, tool_input: dict[str, Any]) -> str:
         return str(ds)
     if tool_input.get("jobId"):
         return str(tool_input["jobId"])
+    if tool_input.get("path"):
+        return str(tool_input["path"])
+    if tool_input.get("command"):
+        return str(tool_input["command"])[:120]
     if tool_input.get("pattern"):
         return str(tool_input["pattern"])
     return tool
