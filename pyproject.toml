@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zcrafter-bridge"
-version = "0.3.0"
+version = "0.3.1"
 description = "MCP server that gives AI agents an IBM z/OS mainframe, with every change approved by a person"
 readme = "README.md"
 requires-python = ">=3.11"

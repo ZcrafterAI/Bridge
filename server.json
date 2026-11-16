@@ -3,7 +3,7 @@
   "name": "io.github.ZcrafterAI/bridge",
   "title": "Zcrafter Bridge",
   "description": "IBM z/OS mainframe tools for AI agents. Every change needs a person's approval.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "websiteUrl": "https://zcrafter.com",
   "repository": {
     "url": "https://github.com/ZcrafterAI/Bridge",
@@ -13,19 +13,23 @@
     {
       "src": "https://raw.githubusercontent.com/ZcrafterAI/Bridge/main/assets/zcrafter-mark-512.png",
       "mimeType": "image/png",
-      "sizes": ["512x512"]
+      "sizes": [
+        "512x512"
+      ]
     },
     {
       "src": "https://raw.githubusercontent.com/ZcrafterAI/Bridge/main/assets/zcrafter-mark.svg",
       "mimeType": "image/svg+xml",
-      "sizes": ["any"]
+      "sizes": [
+        "any"
+      ]
     }
   ],
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "zcrafter-bridge",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

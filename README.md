@@ -1,9 +1,4 @@
-<p>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/zcrafter-logo-on-dark.png">
-    <img src="assets/zcrafter-logo-on-light.png" alt="Zcrafter" width="220">
-  </picture>
-</p>
+<img src="https://raw.githubusercontent.com/ZcrafterAI/Bridge/main/assets/zcrafter-banner.png" alt="Zcrafter" width="300">
 
 # Zcrafter Bridge: MCP server for IBM z/OS mainframes
 
@@ -11,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/zcrafter-bridge)](https://pypi.org/project/zcrafter-bridge/)
 [![Tests](https://github.com/ZcrafterAI/Bridge/actions/workflows/test.yml/badge.svg)](https://github.com/ZcrafterAI/Bridge/actions/workflows/test.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-black)](https://github.com/ZcrafterAI/Bridge/blob/main/LICENSE)
 
 Give AI Agents real access to your mainframe and keep it from changing anything you haven't approved.
 
@@ -47,7 +42,7 @@ uv tool install zcrafter-bridge
 
 Either way you get one command, `zcrafter-bridge`. Bridge is on [PyPI](https://pypi.org/project/zcrafter-bridge/) and in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.ZcrafterAI/bridge) as `io.github.ZcrafterAI/bridge`. To run it with no install step at all, use `uvx zcrafter-bridge` as the command in your client. It needs Python 3.11 or newer, which uv fetches for you. It no longer needs Node.
 
-What the installer does: it finds [uv](https://docs.astral.sh/uv/) (or installs it for your user), then runs `uv tool install`, which puts Bridge and its dependencies in a folder of their own under your home directory. It uses no `sudo` and changes nothing system-wide. You can read it first: [install.sh](install.sh). To remove Bridge: `uv tool uninstall zcrafter-bridge`.
+What the installer does: it finds [uv](https://docs.astral.sh/uv/) (or installs it for your user), then runs `uv tool install`, which puts Bridge and its dependencies in a folder of their own under your home directory. It uses no `sudo` and changes nothing system-wide. You can read it first: [install.sh](https://github.com/ZcrafterAI/Bridge/blob/main/install.sh). To remove Bridge: `uv tool uninstall zcrafter-bridge`.
 
 ### Connect your AI client
 
@@ -101,7 +96,7 @@ Bridge signs in to z/OSMF as you. It looks for your sign-in in this order:
 
 The page's address carries a one-time token the agent never sees, so an agent that can browse still cannot press Approve.
 
-<img width="650" alt="The approval page: what was asked, the plan, and each change it allows" src="docs/approval-page.png" />
+<img width="650" alt="The approval page: what was asked, the plan, and each change it allows" src="https://raw.githubusercontent.com/ZcrafterAI/Bridge/main/docs/approval-page.png" />
 
 **Your yes covers the listed steps and nothing else.** Each step names one tool and its target, for example `member.write` on `PAY.TEST.COBOL(PAYCALC)`. After approval a change runs only if it matches a step, and each step runs once unless the plan says more. A command step fixes the exact command. A step can also fix the exact content, diff or JCL, and then that is what must be sent.
 
@@ -188,7 +183,7 @@ python -m mainframe_workflow_mcp.cli                 # run from source
 
 `credential-resolver/` is the older Node helper for reading the Zowe keychain. Bridge reads the keychain itself now and only falls back to the helper if you have built it (`cd credential-resolver && npm install && npm run build`).
 
-Architecture notes: [docs/architecture.md](docs/architecture.md). The tool catalog lives in `mainframe_workflow_mcp/toolbox/` and the z/OSMF calls in `mainframe_workflow_mcp/clients/`.
+Architecture notes: [docs/architecture.md](https://github.com/ZcrafterAI/Bridge/blob/main/docs/architecture.md). The tool catalog lives in `mainframe_workflow_mcp/toolbox/` and the z/OSMF calls in `mainframe_workflow_mcp/clients/`.
 
 ---
 
@@ -210,8 +205,8 @@ Architecture notes: [docs/architecture.md](docs/architecture.md). The tool catal
 
 **Is it free?** Yes, MIT licensed.
 
-**Who makes it?** [Zcrafter](https://zcrafter.com), which also makes [Cobots](https://cobots.zcrafter.com), a desktop app where a team of AI agents works on your mainframe.
+**Who makes it?** [Zcrafter](https://zcrafter.com), which builds AI agents for the mainframe.
 
 ---
 
-MIT licensed. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+MIT licensed. Contributions welcome — see [CONTRIBUTING.md](https://github.com/ZcrafterAI/Bridge/blob/main/CONTRIBUTING.md).
